@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Ecofinity — Order &amp; Project Cockpit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --ink:#1E2A32;
+  --ink-soft:#57646D;
+  --paper:#F2F0EA;
+  --paper-raised:#FFFFFF;
+  --line:#D9D5C9;
+  --line-strong:#B9B4A6;
+  --steel:#3E6E86;
+  --steel-dark:#2C5064;
+  --amber:#C9862E;
+  --brick:#B54B3A;
+  --moss:#5C7C5C;
+  --slate:#8B939B;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'IBM Plex Sans', system-ui, sans-serif;
+  font-size:14px;
+  line-height:1.5;
+}
+h1,h2,h3,h4{
+  font-family:'Archivo', 'Arial Narrow', sans-serif;
+  font-weight:800;
+  letter-spacing:0.2px;
+  margin:0;
+  color:var(--ink);
+}
+.mono{font-family:'IBM Plex Mono', ui-monospace, monospace;}
+.app{display:flex; min-height:100vh;}
+
+/* ---------- rail ---------- */
+.rail{
+  width:216px; flex:0 0 216px;
+  background:var(--ink);
+  color:#EDEBE3;
+  padding:22px 0 18px;
+  display:flex; flex-direction:column;
+}
+.rail .brand{padding:0 20px 18px; border-bottom:1px solid rgba(255,255,255,0.14); margin-bottom:14px;}
+.rail .brand .word{font-family:'Archivo'; font-weight:800; font-size:19px; letter-spacing:0.5px; color:#fff;}
+.rail .brand .sub{font-family:'IBM Plex Mono'; font-size:10.5px; color:#A9B6BE; margin-top:4px; letter-spacing:0.4px;}
+.rail .peildatum{padding:0 20px; margin-bottom:10px; font-family:'IBM Plex Mono'; font-size:10.5px; color:#94A3AB;}
+.conn-badge{margin:0 20px 16px; padding:6px 9px; font-family:'IBM Plex Mono'; font-size:10px; letter-spacing:0.3px; border:1px solid rgba(255,255,255,0.16);}
+.conn-badge.demo{color:#C9D2D6;}
+.conn-badge.live{color:#8FE0C0; border-color:#3E8F6E; background:rgba(62,143,110,0.12);}
+.conn-badge.error{color:#F0A794; border-color:#B54B3A; background:rgba(181,75,58,0.12);}
+.rail nav{display:flex; flex-direction:column; gap:2px; flex:1;}
+.rail button.navbtn{
+  all:unset; cursor:pointer; display:flex; align-items:baseline; gap:10px;
+  padding:9px 20px; font-size:13px; color:#C9D2D6; border-left:3px solid transparent;
+}
+.rail button.navbtn .n{font-family:'IBM Plex Mono'; font-size:11px; color:#7C8A92;}
+.rail button.navbtn:hover{background:rgba(255,255,255,0.05); color:#fff;}
+.rail button.navbtn.active{background:rgba(255,255,255,0.08); color:#fff; border-left-color:var(--steel);}
+.rail button.navbtn.active .n{color:#8FC1D6;}
+.rail .footnote{padding:14px 20px 0; font-size:10.5px; color:#7C8A92; border-top:1px solid rgba(255,255,255,0.1); margin-top:10px;}
+
+/* ---------- main ---------- */
+main{flex:1; padding:30px 38px 60px; max-width:1180px;}
+.pagehead{margin-bottom:22px;}
+.pagehead h1{font-size:22px;}
+.pagehead .desc{color:var(--ink-soft); font-size:13px; margin-top:4px; max-width:640px;}
+
+/* KPI grid */
+.kpi-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:26px;}
+.kpi{
+  background:var(--paper-raised); border:1px solid var(--line); border-left:3px solid var(--slate);
+  padding:12px 14px; cursor:pointer; text-align:left;
+}
+.kpi:hover{border-left-color:var(--steel); background:#FBFAF7;}
+.kpi .num{font-family:'IBM Plex Mono'; font-weight:600; font-size:24px; line-height:1;}
+.kpi .lbl{font-size:11.5px; color:var(--ink-soft); margin-top:6px;}
+.kpi.flag{border-left-color:var(--brick);}
+.kpi.flag .num{color:var(--brick);}
+
+/* briefing */
+.briefing{background:var(--paper-raised); border:1px solid var(--line); padding:16px 18px; margin-bottom:26px;}
+.briefing h3{font-size:13px; text-transform:none; margin-bottom:10px;}
+.briefing ul{margin:0; padding-left:0; list-style:none;}
+.briefing li{padding:5px 0; border-top:1px solid var(--line); font-size:13px;}
+.briefing li:first-child{border-top:none;}
+.briefing li .q{color:var(--ink-soft); margin-right:6px;}
+.briefing li b{font-family:'IBM Plex Mono'; font-weight:600;}
+
+/* two column */
+.cols{display:grid; grid-template-columns:1.4fr 1fr; gap:18px; align-items:start;}
+
+/* table / ledger */
+table.ledger{width:100%; border-collapse:collapse; background:var(--paper-raised); border:1px solid var(--line);}
+table.ledger th{
+  text-align:left; font-family:'IBM Plex Mono'; font-weight:500; font-size:10.5px; letter-spacing:0.3px;
+  color:var(--ink-soft); padding:9px 10px; border-bottom:1px solid var(--line-strong); background:#F8F6F1;
+}
+table.ledger td{padding:10px 10px; border-bottom:1px solid var(--line); font-size:13px; vertical-align:top;}
+table.ledger tr:last-child td{border-bottom:none;}
+table.ledger tr.clickrow{cursor:pointer;}
+table.ledger tr.clickrow:hover{background:#F8F6EF;}
+.prio{font-family:'IBM Plex Mono'; color:var(--ink-soft);}
+.cust{font-weight:600;}
+.sub{color:var(--ink-soft); font-size:11.5px;}
+
+.badge{display:inline-block; padding:2px 7px; font-size:11px; font-family:'IBM Plex Mono'; border:1px solid transparent;}
+.badge.ok{color:var(--moss); border-color:var(--moss);}
+.badge.warn{color:var(--amber); border-color:var(--amber);}
+.badge.due{color:#fff; background:var(--amber);}
+.badge.late{color:#fff; background:var(--brick);}
+.badge.hold{color:var(--ink-soft); border-color:var(--slate); background:#EDEAE1;}
+.badge.unknown{color:var(--steel-dark); border-color:var(--steel);}
+
+.phase-pill{font-size:12px;}
+.phase-pill .code{font-family:'IBM Plex Mono'; color:var(--ink-soft); margin-right:5px;}
+
+/* planning queue */
+.plan-list{background:var(--paper-raised); border:1px solid var(--line);}
+.plan-row{display:flex; align-items:center; gap:14px; padding:12px 16px; border-bottom:1px solid var(--line); cursor:pointer;}
+.plan-row:hover{background:#F8F6EF;}
+.plan-row:last-child{border-bottom:none;}
+.plan-row .rank{font-family:'IBM Plex Mono'; font-size:20px; font-weight:600; color:var(--steel); width:28px;}
+.plan-row .who{flex:1;}
+.plan-row .who .name{font-weight:600;}
+.plan-row .who .meta{font-size:11.5px; color:var(--ink-soft);}
+.plan-row .days{font-family:'IBM Plex Mono'; font-size:12px; color:var(--ink-soft); text-align:right;}
+.plan-skip{padding:10px 16px; font-size:12px; color:var(--ink-soft); border-top:1px dashed var(--line-strong); background:#F5F3EC;}
+.plan-skip .row{display:flex; justify-content:space-between; padding:4px 0;}
+
+/* kanban */
+.kanban{display:grid; grid-template-columns:repeat(7,1fr); gap:8px; align-items:start;}
+.kcol{background:#EAE7DE; border:1px solid var(--line); min-height:120px;}
+.kcol .khead{font-family:'IBM Plex Mono'; font-size:10.5px; font-weight:600; line-height:1.3; padding:9px 8px; border-bottom:2px solid var(--ink); background:#DEDACE;}
+.kcol .kbody{padding:7px; display:flex; flex-direction:column; gap:7px;}
+.kcard{background:var(--paper-raised); border:1px solid var(--line); border-left:3px solid var(--steel); padding:8px 9px; font-size:11.5px; cursor:pointer;}
+.kcard:hover{border-left-color:var(--steel-dark); box-shadow:0 1px 0 var(--line-strong);}
+.kcard.hold{border-left-color:var(--slate); opacity:0.75;}
+.kcard.flag{border-left-color:var(--brick);}
+.kcard .kc-name{font-weight:600; font-size:12px;}
+.kcard .kc-type{color:var(--ink-soft); font-size:10.5px; margin:2px 0 6px;}
+.kcard .kc-meta{font-family:'IBM Plex Mono'; font-size:10px; color:var(--ink-soft); display:flex; justify-content:space-between;}
+.kcard .kc-flagline{margin-top:5px; font-size:10.5px; color:var(--brick);}
+
+/* detail */
+.backlink{all:unset; cursor:pointer; color:var(--steel-dark); font-size:12.5px; font-family:'IBM Plex Mono'; margin-bottom:14px; display:inline-block;}
+.backlink:hover{text-decoration:underline;}
+.detail-head{background:var(--paper-raised); border:1px solid var(--line); padding:20px 22px; margin-bottom:20px;}
+.detail-head h2{font-size:20px;}
+.detail-head .type{color:var(--ink-soft); font-size:13px; margin-top:2px;}
+.detail-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line);}
+.detail-grid .k{font-size:10.5px; font-family:'IBM Plex Mono'; color:var(--ink-soft); margin-bottom:4px;}
+.detail-grid .v{font-size:15px; font-weight:600;}
+
+.workoverview{width:100%; border-collapse:collapse; background:var(--paper-raised); border:1px solid var(--line);}
+.workoverview th{text-align:left; font-family:'IBM Plex Sans'; font-weight:500; font-size:12.5px; color:var(--ink-soft); padding:12px 16px; border-bottom:1px solid var(--line); background:#F8F6F1;}
+.workoverview td{padding:13px 16px; border-bottom:1px solid var(--line); font-size:13.5px;}
+.workoverview tr:last-child td{border-bottom:none;}
+.workoverview td.num, .workoverview th.num{text-align:right;}
+.workoverview .phase-done{color:var(--ink-soft);}
+.pill-klaar{display:inline-block; padding:3px 12px; border-radius:999px; background:#DCF3EF; color:#1E8F7E; font-size:12px; font-weight:600;}
+
+.timeline{background:var(--paper-raised); border:1px solid var(--line); padding:6px 0;}
+.tstep{display:flex; gap:14px; padding:14px 22px; border-bottom:1px solid var(--line); position:relative;}
+.tstep:last-child{border-bottom:none;}
+.tstep .mark{font-family:'IBM Plex Mono'; font-size:15px; width:20px; flex:0 0 20px; text-align:center; padding-top:1px;}
+.tstep.done .mark{color:var(--moss);}
+.tstep.current .mark{color:var(--steel);}
+.tstep.todo .mark{color:var(--slate);}
+.tstep .body{flex:1;}
+.tstep .code{font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--ink-soft); margin-right:8px;}
+.tstep .label{font-weight:600; font-size:13.5px;}
+.tstep .info{font-size:12px; color:var(--ink-soft); margin-top:3px;}
+.tstep.current{background:#F4F8F9;}
+.warnbox{margin-top:8px; padding:7px 10px; background:#FBEFE6; border:1px solid var(--amber); color:#7A4E1B; font-size:12px;}
+.warnbox.crit{background:#FBEAE7; border-color:var(--brick); color:#7A2E22;}
+
+.panel{background:var(--paper-raised); border:1px solid var(--line); padding:16px 18px;}
+.panel h3{font-size:13px; margin-bottom:12px;}
+.bottleneck-hero{border:1px solid var(--brick); background:#FBEAE7; padding:14px 16px; margin-bottom:18px;}
+.bottleneck-hero .k{font-family:'IBM Plex Mono'; font-size:10.5px; color:#7A2E22; letter-spacing:0.3px;}
+.bottleneck-hero h2{font-size:18px; color:#7A2E22; margin:4px 0 8px;}
+.bottleneck-hero .stats{display:flex; gap:26px; font-size:12.5px; color:#7A2E22;}
+.bottleneck-hero .stats b{font-family:'IBM Plex Mono'; font-size:15px; display:block;}
+
+.durtable{width:100%; border-collapse:collapse;}
+.durtable td{padding:8px 4px; border-bottom:1px solid var(--line); font-size:13px;}
+.durtable td:last-child{text-align:right; font-family:'IBM Plex Mono'; font-weight:600;}
+.durtable tr:last-child td{border-bottom:none;}
+.durtable tr.hi td{color:var(--brick); font-weight:600;}
+
+.bar-outer{background:#EAE7DE; height:6px; margin-top:4px;}
+.bar-inner{background:var(--steel); height:6px;}
+.bar-inner.hi{background:var(--brick);}
+
+/* settings */
+.map-table{width:100%; border-collapse:collapse; background:var(--paper-raised); border:1px solid var(--line);}
+.map-table th{text-align:left; font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--ink-soft); padding:9px 12px; border-bottom:1px solid var(--line-strong); background:#F8F6F1;}
+.map-table td{padding:10px 12px; border-bottom:1px solid var(--line); font-size:13px;}
+.map-table tr:last-child td{border-bottom:none;}
+.map-table .arrow{color:var(--slate); margin:0 8px;}
+.unmapped-row td{background:#FBF3E4;}
+.pill-btn{all:unset; font-family:'IBM Plex Mono'; font-size:11px; padding:4px 10px; border:1px solid var(--steel); color:var(--steel-dark); cursor:pointer;}
+.pill-btn:hover{background:var(--steel); color:#fff;}
+
+.section-title{font-family:'IBM Plex Mono'; font-size:11px; color:var(--ink-soft); letter-spacing:0.4px; margin:26px 0 10px;}
+.section-title:first-child{margin-top:0;}
+
+@media (max-width: 980px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .cols{grid-template-columns:1fr;}
+  .kanban{grid-template-columns:repeat(4,1fr);}
+  .detail-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="rail">
+    <div class="brand">
+      <div class="word">ECOFINITY</div>
+      <div class="sub">ORDER &amp; PROJECT COCKPIT</div>
+    </div>
+    <div class="peildatum">PEILDATUM · 27/09/2026</div>
+    <div id="connectionBadge" class="conn-badge"></div>
+    <nav id="nav"></nav>
+    <div class="footnote">Fasen &amp; data komen rechtstreeks<br>uit Teamleader. Concept met<br>voorbeelddata.</div>
+  </div>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ============================================================
+   DATA MODEL — de 7 vaste Ecofinity/Teamleader-projectfasen
+   ============================================================ */
+const REF_DATE = new Date(2026,8,27); // 27/09/2026 — vaste peildatum voor dit concept
+
+const PHASES = [
+  {code:'01', label:'Bij bestelling'},
+  {code:'02', label:'Materiaal bestellen'},
+  {code:'03', label:'Materialen in afwachting van levering'},
+  {code:'04', label:'Uitvoering in te plannen'},
+  {code:'05', label:'Uitvoering ingepland'},
+  {code:'06', label:'Uitvoering afgewerkt'},
+  {code:'07', label:'Administratie afgewerkt'},
+];
+const KANBAN_LABELS = [
+  'BIJ<br>BESTELLING','MATERIAAL<br>BESTELLEN','WACHT OP<br>LEVERING',
+  'UITVOERING<br>IN TE PLANNEN','UITVOERING<br>INGEPLAND','UITVOERING<br>AFGEWERKT','ADMINISTRATIE<br>AFGEWERKT'
+];
+
+function phaseByCode(c){ return PHASES.find(p=>p.code===c); }
+function phaseIdx(c){ return PHASES.findIndex(p=>p.code===c); }
+function pd(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function fmt(s){ if(!s) return '—'; const d=pd(s); return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit',year:'numeric'}); }
+function fmtLong(s){ if(!s) return '—'; const d=pd(s); return d.toLocaleDateString('nl-BE',{day:'numeric',month:'long',year:'numeric'}); }
+function daysBetween(a,b){ return Math.round((b-a)/86400000); }
+
+const FALLBACK_PROJECTS = [
+  { id:'p1', dealId:'DEAL-1042', priority:14, customer:'Familie De Smet', type:'Warmtepomp lucht/water', projectId:'PRJ-284',
+    dealClosedAt:'2026-08-21', phaseEnteredDate:'2026-09-16',
+    history:{'01':{done:true,date:'2026-08-22'},'02':{done:true,date:'2026-09-18'}},
+    deadlines:{'03':'2026-09-27','04':'2026-10-05','05':'2026-10-13','06':'2026-10-21','07':'2026-10-29'},
+    workOverview:{'01':{reg:'-',est:'1u00'},'02':{reg:'-',est:'-'},'03':{reg:'-',est:'-'},'04':{reg:'-',est:'-'},'05':{reg:'-',est:'-'},'06':{reg:'-',est:'-'},'07':{reg:'-',est:'-'}} },
+
+  { id:'p2', dealId:'DEAL-1011', priority:9, customer:'Familie Janssens', type:'Zonnepanelen (12 stuks)', projectId:'PRJ-260',
+    dealClosedAt:'2026-08-12', phaseEnteredDate:'2026-09-20',
+    history:{'01':{done:true,date:'2026-08-13'},'02':{done:true,date:'2026-08-29'},'03':{done:true,date:'2026-09-20'}},
+    deadlines:{'04':'2026-09-25'} },
+
+  { id:'p3', dealId:'DEAL-1015', priority:11, customer:'Familie Peeters', type:'Warmtepomp lucht/lucht', projectId:'PRJ-271',
+    dealClosedAt:'2026-08-15', phaseEnteredDate:'2026-09-22',
+    history:{'01':{done:true,date:'2026-08-16'},'02':{done:true,date:'2026-09-02'},'03':{done:true,date:'2026-09-22'}},
+    deadlines:{'04':'2026-10-02'} },
+
+  { id:'p4', dealId:'DEAL-1024', priority:18, customer:'Familie Claeys', type:'Laadpaal', projectId:'PRJ-299',
+    dealClosedAt:'2026-08-24', phaseEnteredDate:'2026-09-25',
+    history:{'01':{done:true,date:'2026-08-25'},'02':{done:true,date:'2026-09-05'},'03':{done:true,date:'2026-09-25'}},
+    deadlines:{'04':'2026-10-10'} },
+
+  { id:'p5', dealId:'DEAL-1002', priority:8, customer:'Familie Vermeulen', type:'Warmtepomp lucht/water', projectId:'PRJ-241',
+    dealClosedAt:'2026-07-30', phaseEnteredDate:'2026-09-10',
+    history:{'01':{done:true,date:'2026-07-31'},'02':{done:true,date:'2026-08-14'},'03':{done:true,date:'2026-09-10'}},
+    deadlines:{'04':'2026-09-20'},
+    hold:{reason:'Klant vraagt uitstel', note:'Klant wenst uitvoering pas vanaf november'} },
+
+  { id:'p6', dealId:'DEAL-1031', priority:20, customer:'Familie Van Acker', type:'Dakisolatie', projectId:'PRJ-305',
+    dealClosedAt:'2026-08-28', phaseEnteredDate:'2026-08-28',
+    history:{}, deadlines:{} },
+
+  { id:'p7', dealId:'DEAL-1026', priority:16, customer:'Familie Willems', type:'Warmtepomp lucht/water', projectId:'PRJ-291',
+    dealClosedAt:'2026-08-22', phaseEnteredDate:'2026-09-02',
+    history:{'01':{done:true,date:'2026-08-23'}}, deadlines:{'02':'2026-09-30'} },
+
+  { id:'p8', dealId:'DEAL-1016', priority:12, customer:'Familie Mertens', type:'Zonnepanelen (9 stuks)', projectId:'PRJ-275',
+    dealClosedAt:'2026-08-16', phaseEnteredDate:'2026-09-18',
+    history:{'01':{done:true,date:'2026-08-17'},'02':{done:true,date:'2026-08-30'},'03':{done:true,date:'2026-09-18'},'04':{done:true,date:'2026-09-18'}},
+    deadlines:{'05':'2026-10-13'},
+    installation:{date:'2026-10-06', start:'08:00', end:'16:00', team:'Team Noord — Kevin &amp; Tom'} },
+
+  { id:'p9', dealId:'DEAL-1019', priority:13, customer:'Familie Bogaert', type:'Warmtepomp lucht/water', projectId:'PRJ-279',
+    dealClosedAt:'2026-08-19', phaseEnteredDate:'2026-09-15',
+    history:{'01':{done:true,date:'2026-08-20'},'02':{done:true,date:'2026-09-01'},'03':{done:true,date:'2026-09-15'},'04':{done:true,date:'2026-09-15'}},
+    deadlines:{'05':'2026-10-09'},
+    installation:null },
+
+  { id:'p10', dealId:'DEAL-0994', priority:6, customer:'Familie Coppens', type:'Laadpaal', projectId:'PRJ-233',
+    dealClosedAt:'2026-07-28', phaseEnteredDate:'2026-09-10',
+    history:{'01':{done:true,date:'2026-07-29'},'02':{done:true,date:'2026-08-05'},'03':{done:true,date:'2026-08-20'},'04':{done:true,date:'2026-09-05'},'05':{done:true,date:'2026-09-10'}},
+    deadlines:{'06':'2026-09-24'} },
+
+  { id:'p11', dealId:'DEAL-0987', priority:5, customer:'Familie Van Damme', type:'Zonnepanelen (16 stuks)', projectId:'PRJ-220',
+    dealClosedAt:'2026-08-02', phaseEnteredDate:'2026-09-20',
+    history:{'01':{done:true,date:'2026-08-03'},'02':{done:true,date:'2026-08-12'},'03':{done:true,date:'2026-08-25'},'04':{done:true,date:'2026-09-05'},'05':{done:true,date:'2026-09-12'},'06':{done:true,date:'2026-09-20'}},
+    deadlines:{'07':'2026-10-01'} },
+
+  { id:'p12', dealId:'DEAL-0955', priority:3, customer:"Familie D'Hondt", type:'Warmtepomp lucht/water', projectId:'PRJ-198',
+    dealClosedAt:'2026-07-10', phaseEnteredDate:'2026-08-20',
+    history:{'01':{done:true,date:'2026-07-11'},'02':{done:true,date:'2026-07-20'},'03':{done:true,date:'2026-08-01'},'04':{done:true,date:'2026-08-10'},'05':{done:true,date:'2026-08-15'},'06':{done:true,date:'2026-08-20'},'07':{done:true,date:'2026-09-05'}},
+    deadlines:{} },
+
+  { id:'p13', dealId:'DEAL-1033', priority:22, customer:'Familie Lambrecht', type:'Warmtepomp lucht/water', projectId:'PRJ-311',
+    dealClosedAt:'2026-09-01', phaseEnteredDate:'2026-09-21',
+    history:{'01':{done:true,date:'2026-09-02'},'02':{done:false},'03':{done:true,date:'2026-09-15'}},
+    deadlines:{'05':'2026-10-11'},
+    teamleaderActivePhase:'05',
+    installation:{date:'2026-10-11', start:'09:00', end:'15:00', team:'Team Zuid — Bram &amp; Yorick'} },
+
+  { id:'p14', dealId:'DEAL-1036', priority:25, customer:'Familie Sterckx', type:'Warmtepomp lucht/water', projectId:'PRJ-318',
+    dealClosedAt:'2026-09-03', currentPhaseCode:null, phaseEnteredDate:'2026-09-24',
+    history:{'01':{done:true,date:'2026-09-04'},'02':{done:true,date:'2026-09-15'},'03':{done:true,date:'2026-09-24'}},
+    deadlines:{}, unknownPhase:'Nazorgcontrole' },
+
+  { id:'p15', dealId:'DEAL-1038', priority:27, customer:'Familie Aerts', type:'Warmtepomp lucht/water', projectId:null,
+    dealClosedAt:'2026-09-04', currentPhaseCode:null, phaseEnteredDate:'2026-09-04',
+    history:{}, deadlines:{}, missingProject:true },
+];
+
+/* historische doorlooptijd-KPI's — fallback (wordt overschreven door live backend-data indien verbonden) */
+const FALLBACK_DURATION_STATS = [
+  {code:'01', avg:1.8, median:1, active:6, oldest:9},
+  {code:'02', avg:2.4, median:2, active:5, oldest:11},
+  {code:'03', avg:16.7, median:13, active:12, oldest:31},
+  {code:'04', avg:8.3, median:6, active:9, oldest:19},
+  {code:'05', avg:12.5, median:11, active:7, oldest:22},
+  {code:'06', avg:1.6, median:1, active:3, oldest:5},
+  {code:'07', avg:null, median:null, active:2, oldest:6},
+];
+
+/* ============================================================
+   FASE-DERIVATIE — deriveCurrentProjectPhase(project)
+   Regel 1: doorloop de 7 fasen in vaste volgorde.
+   Regel 2: volledig afgewerkte fasen = voltooid.
+   Regel 3: eerste niet-voltooide fase = actuele fase.
+   Regel 4: als Teamleader expliciet een latere fase actief meldt, gebruik die.
+   Regel 5: bij inconsistentie: NIET stilzwijgend corrigeren — flaggen.
+   ============================================================ */
+function deriveCurrentProjectPhase(pr){
+  if(pr.missingProject || pr.unknownPhase) return; // buiten de 7-fasenlogica, apart behandeld
+  const seqIdx = PHASES.findIndex(ph => !(pr.history && pr.history[ph.code] && pr.history[ph.code].done));
+  if(seqIdx === -1){ pr.currentPhaseCode='07'; pr.closed=true; return; } // Regel 2: alles voltooid
+  const seqCode = PHASES[seqIdx].code; // Regel 3
+
+  const explicit = pr.teamleaderActivePhase; // wat Teamleader zelf als actief meldt
+  if(explicit && explicit !== seqCode && phaseIdx(explicit) > seqIdx){
+    // Regel 4 + Regel 5: latere fase is actief terwijl een eerdere fase niet is afgevinkt
+    pr.currentPhaseCode = explicit;
+    pr.closed = false;
+    pr.dataIssue = pr.dataIssue || `${phaseByCode(seqCode).label} staat niet als afgerond in Teamleader, terwijl ${phaseByCode(explicit).label} al actief staat.`;
+    return;
+  }
+  pr.currentPhaseCode = seqCode;
+  pr.closed = false;
+}
+FALLBACK_PROJECTS.forEach(deriveCurrentProjectPhase);
+let PROJECTS = FALLBACK_PROJECTS; // wordt vervangen door live backend-data zodra verbonden
+let DURATION_STATS = FALLBACK_DURATION_STATS;
+
+/* configureerbare grenswaarden voor deadline-alerts (sectie 9) */
+let CONFIG = { attentionThresholdDays: 7 };
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function activePhase(pr){
+  if(pr.missingProject) return null;
+  if(pr.unknownPhase) return null;
+  return phaseByCode(pr.currentPhaseCode);
+}
+function daysInPhase(pr){ return daysBetween(pd(pr.phaseEnteredDate), REF_DATE); }
+function daysSinceOrder(pr){ return daysBetween(pd(pr.dealClosedAt), REF_DATE); }
+
+function deadlineStatus(pr){
+  const dl = pr.deadlines && pr.deadlines[pr.currentPhaseCode];
+  if(!dl) return null;
+  const diff = daysBetween(REF_DATE, pd(dl));
+  const T = CONFIG.attentionThresholdDays;
+  if(diff>T)  return {cls:'ok',   text:'Normaal',                                    diff};
+  if(diff>0)  return {cls:'warn', text:`Aandacht — nog ${diff} d.`,                   diff};
+  if(diff===0)return {cls:'due',  text:'Dringend — vandaag',                          diff};
+  return         {cls:'late', text:`Te laat — ${Math.abs(diff)} d. overschreden`, diff};
+}
+function hasIssue(pr){
+  return !!(pr.hold || pr.dataIssue || pr.unknownPhase || pr.missingProject ||
+    (pr.currentPhaseCode==='05' && !pr.installation));
+}
+function phaseLabelOf(pr){
+  if(pr.missingProject) return 'Geen Teamleader-project gekoppeld';
+  if(pr.unknownPhase) return pr.unknownPhase;
+  const ph = phaseByCode(pr.currentPhaseCode);
+  return ph ? ph.label : '—';
+}
+function activeProjects(){ return PROJECTS.filter(p=>!p.closed); }
+
+/* ============================================================
+   LIVE TEAMLEADER-KOPPELING
+   Verbindt met de backend uit /ecofinity-integration (zie README daar). Bij succes vervangen
+   we de demo-mockdata door de echte Teamleader-data; bij falen blijft alles gewoon in
+   demo-modus staan. Er wordt hier bewust NIETS automatisch geprobeerd bij het opstarten:
+   de backend draait niet op hetzelfde adres voor iedereen, dus de gebruiker verbindt zelf
+   via de instellingenpagina.
+   ============================================================ */
+function mapLiveProject(item){
+  return {
+    id: item.dealId,
+    dealId: item.dealId,
+    projectId: item.projectId,
+    priority: item.priority,
+    customer: item.customer,
+    type: item.type,
+    dealClosedAt: item.dealClosedAt,
+    phaseEnteredDate: item.phaseEnteredDate,
+    history: item.history || {},
+    deadlines: item.deadlines || {},
+    workOverview: item.workOverview || {},
+    installation: item.installation || null,
+    hold: item.hold || null,
+    missingProject: !!item.missingProject,
+    currentPhaseCode: item.currentPhaseCode,
+    closed: !!item.closed,
+    dataIssue: item.dataIssue || null,
+    unknownPhase: item.unknownPhaseLabel || null,
+  };
+}
+
+async function connectToBackend(rawUrl){
+  const url = rawUrl.replace(/\/+$/,'');
+  state.connectionError = null;
+  try{
+    const res = await fetch(url + '/api/cockpit-data');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    PROJECTS = (data.projects || []).map(mapLiveProject);
+    DURATION_STATS = data.durationStats || FALLBACK_DURATION_STATS;
+    CONFIG.attentionThresholdDays = (data.config && data.config.attentionThresholdDays) || CONFIG.attentionThresholdDays;
+    state.apiBase = url;
+    state.connected = true;
+  }catch(err){
+    state.connected = false;
+    state.connectionError = err.message || 'Onbekende fout bij verbinden.';
+  }
+  render();
+}
+
+function disconnectFromBackend(){
+  PROJECTS = FALLBACK_PROJECTS;
+  DURATION_STATS = FALLBACK_DURATION_STATS;
+  CONFIG.attentionThresholdDays = 7;
+  state.apiBase = '';
+  state.connected = false;
+  state.connectionError = null;
+  render();
+}
+
+/* ============================================================
+   STATE + NAV
+   ============================================================ */
+const state = { view:'dashboard', filter:null, selectedId:null, search:'', showClosed:false, apiBase:'', connected:false, connectionError:null };
+
+const NAV = [
+  {key:'dashboard', n:'—', label:'Overzicht'},
+  {key:'queue', n:'§', label:'Bestelwachtrij'},
+  {key:'planning', n:'▶', label:'Planningswachtrij'},
+  {key:'kanban', n:'▦', label:'Kanban'},
+  {key:'duration', n:'∅', label:'Doorlooptijd'},
+  {key:'settings', n:'⚙', label:'Fase-instellingen'},
+];
+
+function renderNav(){
+  const nav = document.getElementById('nav');
+  nav.innerHTML = NAV.map(item=>`
+    <button class="navbtn ${state.view===item.key?'active':''}" data-nav="${item.key}">
+      <span class="n">${item.n}</span> ${item.label}
+    </button>`).join('');
+  nav.querySelectorAll('[data-nav]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ state.view=btn.dataset.nav; state.filter=null; render(); });
+  });
+}
+
+function goTo(view, filter){ state.view=view; state.filter=filter||null; state.selectedId=null; render(); }
+function openProject(id){ state.selectedId=id; state.view='detail'; render(); }
+
+/* ============================================================
+   VIEW: DASHBOARD
+   ============================================================ */
+function viewDashboard(){
+  const live = activeProjects();
+  const count = code => live.filter(p=>p.currentPhaseCode===code).length;
+  const kpis = [
+    {label:'Gewonnen / actieve bestellingen', num:live.length, filter:null},
+    {label:'Bij bestelling',            num:count('01'), filter:{phase:'01'}},
+    {label:'Materiaal bestellen',       num:count('02'), filter:{phase:'02'}},
+    {label:'Wacht op materiaal',        num:count('03'), filter:{phase:'03'}},
+    {label:'Uitvoering in te plannen',  num:count('04'), filter:{phase:'04'}},
+    {label:'Uitvoering ingepland',      num:count('05'), filter:{phase:'05'}},
+    {label:'Uitvoering afgewerkt',      num:count('06'), filter:{phase:'06'}},
+    {label:'Administratief af te werken', num:count('07'), filter:{phase:'07'}},
+    {label:'Project ontbreekt', num:live.filter(p=>p.missingProject).length, filter:{special:'missing'}, flag:true},
+    {label:'On hold / probleem', num:live.filter(hasIssue).length, filter:{special:'issue'}, flag:true},
+  ];
+
+  const readyQueue = live.filter(p=>p.currentPhaseCode==='04' && !p.hold).sort((a,b)=>pd(a.dealClosedAt)-pd(b.dealClosedAt));
+  const firstReady = readyQueue[0];
+  const missingInstall = live.filter(p=>p.currentPhaseCode==='05' && !p.installation);
+  const overdue = live.filter(p=>{const s=deadlineStatus(p); return s && s.cls==='late';});
+  const dueToday = live.filter(p=>{const s=deadlineStatus(p); return s && s.cls==='due';});
+
+  return `
+    <div class="pagehead">
+      <h1>Overzicht</h1>
+      <div class="desc">Alle telkaarten volgen rechtstreeks uit de bestaande Teamleader-fasen. Klik op een kaart om de bestelwachtrij gefilterd te openen.</div>
+    </div>
+    <div class="kpi-grid">
+      ${kpis.map(k=>`
+        <button class="kpi ${k.flag && k.num>0 ? 'flag':''}" data-kpi='${JSON.stringify(k.filter)}'>
+          <div class="num">${k.num}</div>
+          <div class="lbl">${k.label}</div>
+        </button>`).join('')}
+    </div>
+    <div class="briefing">
+      <h3>Ochtendbriefing</h3>
+      <ul>
+        <li><span class="q">Wie heeft het eerst besteld en staat klaar voor planning?</span> <b>${firstReady ? firstReady.customer+' (besteld '+fmt(firstReady.dealClosedAt)+')' : '—'}</b></li>
+        <li><span class="q">Nieuwe bestellingen te verwerken (Bij bestelling):</span> <b>${count('01')}</b></li>
+        <li><span class="q">Projecten wachten op levering (Materialen in afwachting):</span> <b>${count('03')}</b></li>
+        <li><span class="q">Klaar voor planning, wachtrij:</span> <b>${readyQueue.length}</b></li>
+        <li><span class="q">Ingepland zonder gevonden planningsafspraak:</span> <b>${missingInstall.length}</b></li>
+        <li><span class="q">Deadlines overschreden:</span> <b style="color:var(--brick)">${overdue.length}</b> &nbsp; <span class="q">deadline vandaag:</span> <b style="color:var(--amber)">${dueToday.length}</b></li>
+      </ul>
+    </div>
+    <div class="section-title">GROOTSTE BOTTLENECK</div>
+    ${bottleneckHero()}
+  `;
+}
+
+function bottleneckHero(){
+  const b = [...DURATION_STATS].filter(d=>d.avg!=null).sort((a,b)=>b.avg-a.avg)[0];
+  const ph = phaseByCode(b.code);
+  return `
+  <div class="bottleneck-hero">
+    <div class="k">HOOGSTE GEMIDDELDE DOORLOOPTIJD</div>
+    <h2>${ph.label}</h2>
+    <div class="stats">
+      <div>Gemiddeld<b>${b.avg} dagen</b></div>
+      <div>Mediaan<b>${b.median} dagen</b></div>
+      <div>Actieve projecten<b>${b.active}</b></div>
+      <div>Oudste<b>${b.oldest} dagen</b></div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   VIEW: ORDER QUEUE
+   ============================================================ */
+function viewQueue(){
+  let list = state.showClosed ? PROJECTS.slice() : activeProjects();
+  let title = state.showClosed ? 'Alle bestellingen (incl. afgewerkt)' : 'Alle actieve bestellingen';
+  if(state.filter){
+    if(state.filter.phase){ list = list.filter(p=>p.currentPhaseCode===state.filter.phase); title = phaseByCode(state.filter.phase).label; }
+    if(state.filter.special==='missing'){ list = list.filter(p=>p.missingProject); title='Project ontbreekt'; }
+    if(state.filter.special==='issue'){ list = list.filter(hasIssue); title='On hold / probleem'; }
+  }
+  if(state.search){
+    const q = state.search.toLowerCase();
+    list = list.filter(p=>p.customer.toLowerCase().includes(q) || (p.projectId||'').toLowerCase().includes(q));
+  }
+  list = [...list].sort((a,b)=>a.priority-b.priority);
+
+  return `
+    <div class="pagehead">
+      <h1>Bestelwachtrij</h1>
+      <div class="desc">${title}${state.filter?' <button class="backlink" data-clearfilter style="margin-left:8px;">(filter wissen)</button>':''}</div>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
+      <input type="text" id="searchInput" placeholder="Zoek op klant of projectnummer…" value="${state.search||''}"
+        style="flex:1; max-width:320px; font-family:'IBM Plex Sans'; font-size:13px; padding:8px 10px; border:1px solid var(--line-strong); background:var(--paper-raised);">
+      <label style="font-size:12.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="showClosedToggle" ${state.showClosed?'checked':''}> toon afgewerkte projecten (historiek)
+      </label>
+    </div>
+    <table class="ledger">
+      <thead><tr>
+        <th>#</th><th>Klant</th><th>Besteld</th><th>Dagen</th><th>Type</th><th>Project</th><th>Huidige fase</th><th>Dagen in fase</th><th>Uitvoering</th>
+      </tr></thead>
+      <tbody>
+        ${list.map(rowQueue).join('') || `<tr><td colspan="9" style="color:var(--ink-soft); padding:20px;">Geen bestellingen in deze selectie.</td></tr>`}
+      </tbody>
+    </table>
+  `;
+}
+function rowQueue(p){
+  const st = deadlineStatus(p);
+  const install = p.installation ? `${fmt(p.installation.date)} ${p.installation.start}–${p.installation.end}` : (p.currentPhaseCode==='05' ? '⚠ ontbreekt' : '—');
+  return `
+    <tr class="clickrow" data-open="${p.id}">
+      <td class="prio">#${String(p.priority).padStart(3,'0')}</td>
+      <td class="cust">${p.customer}${p.hold?`<div class="sub">⏸ ${p.hold.reason}</div>`:''}</td>
+      <td>${fmt(p.dealClosedAt)}</td>
+      <td class="mono">${daysSinceOrder(p)}</td>
+      <td>${p.type}</td>
+      <td class="mono">${p.projectId || '⚠ geen'}${p.dealId ? `<div class="sub">${p.dealId}</div>` : ''}</td>
+      <td><span class="phase-pill"><span class="code">${p.currentPhaseCode || '?'}</span>${phaseLabelOf(p)}</span>${p.unknownPhase?' <span class="badge unknown">onbekend</span>':''}</td>
+      <td class="mono">${p.currentPhaseCode ? daysInPhase(p)+'d' : '—'}</td>
+      <td>${st ? `<span class="badge ${st.cls}">${st.text}</span>` : `<span class="sub">${install}</span>`}</td>
+    </tr>`;
+}
+
+/* ============================================================
+   VIEW: PLANNING QUEUE
+   ============================================================ */
+function viewPlanning(){
+  const all = activeProjects().filter(p=>p.currentPhaseCode==='04');
+  const ready = all.filter(p=>!p.hold).sort((a,b)=>pd(a.dealClosedAt)-pd(b.dealClosedAt));
+  const skipped = all.filter(p=>p.hold).sort((a,b)=>a.priority-b.priority);
+
+  return `
+    <div class="pagehead">
+      <h1>Planningswachtrij</h1>
+      <div class="desc">Welke klant moet volgens de oorspronkelijke bestelvolgorde nu eerst ingepland worden? Gesorteerd op besteldatum van de gewonnen deal.</div>
+    </div>
+    <div class="plan-list">
+      ${ready.map((p,i)=>`
+        <div class="plan-row" data-open="${p.id}">
+          <div class="rank">${i+1}</div>
+          <div class="who">
+            <div class="name">${p.customer}</div>
+            <div class="meta">${p.type} · besteld ${fmt(p.dealClosedAt)} · oorspronkelijke prioriteit #${String(p.priority).padStart(3,'0')}</div>
+          </div>
+          <div class="days">${daysInPhase(p)} dagen<br>klaar voor planning</div>
+        </div>`).join('') || `<div style="padding:18px; color:var(--ink-soft);">Geen projecten klaar voor planning.</div>`}
+      ${skipped.length ? `
+        <div class="plan-skip">
+          <div style="font-weight:600; margin-bottom:4px;">Overgeslagen wegens blokkade</div>
+          ${skipped.map(p=>`<div class="row" data-open="${p.id}" style="cursor:pointer;"><span>${p.customer} — ${p.hold.note}</span><span>oorspronkelijke prioriteit #${String(p.priority).padStart(3,'0')}</span></div>`).join('')}
+        </div>` : ''}
+    </div>
+  `;
+}
+
+/* ============================================================
+   VIEW: KANBAN
+   ============================================================ */
+function viewKanban(){
+  const live = activeProjects();
+  return `
+    <div class="pagehead">
+      <h1>Kanban</h1>
+      <div class="desc">Kolommen volgen exact de zeven vaste Teamleader-fasen, in vaste volgorde.</div>
+    </div>
+    <div class="kanban">
+      ${PHASES.map((ph,i)=>{
+        const items = live.filter(p=>p.currentPhaseCode===ph.code).sort((a,b)=>a.priority-b.priority);
+        return `
+        <div class="kcol">
+          <div class="khead">${KANBAN_LABELS[i]}</div>
+          <div class="kbody">
+            ${items.map(p=>`
+              <div class="kcard ${p.hold?'hold':''} ${hasIssue(p)&&!p.hold?'flag':''}" data-open="${p.id}">
+                <div class="kc-name">${p.customer}</div>
+                <div class="kc-type">${p.type}</div>
+                <div class="kc-meta"><span>Besteld ${fmt(p.dealClosedAt)}</span><span>#${String(p.priority).padStart(3,'0')}</span></div>
+                <div class="kc-meta"><span>${daysInPhase(p)} d. in fase</span><span>${p.deadlines[p.currentPhaseCode] ? 'lever '+fmt(p.deadlines[p.currentPhaseCode]) : ''}</span></div>
+                ${p.hold ? `<div class="kc-flagline">⏸ ${p.hold.reason}</div>` : ''}
+                ${(!p.hold && p.currentPhaseCode==='05' && !p.installation) ? `<div class="kc-flagline">⚠ geen planning gevonden</div>` : ''}
+                ${(!p.hold && p.dataIssue) ? `<div class="kc-flagline">⚠ fasen inconsistent</div>` : ''}
+              </div>`).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ============================================================
+   VIEW: DURATION / BOTTLENECK
+   ============================================================ */
+function viewDuration(){
+  const maxAvg = Math.max(...DURATION_STATS.filter(d=>d.avg).map(d=>d.avg));
+  const worst = [...DURATION_STATS].filter(d=>d.avg).sort((a,b)=>b.avg-a.avg)[0];
+  return `
+    <div class="pagehead">
+      <h1>Doorlooptijd per fase</h1>
+      <div class="desc">Gemiddelde tijd die projecten in elke fase doorbrengen, op basis van fase-historiek. Helpt bottlenecks herkennen.</div>
+    </div>
+    ${bottleneckHero()}
+    <div class="panel">
+      <h3>Gemiddelde doorlooptijd per fase</h3>
+      <table class="durtable">
+        ${DURATION_STATS.map(d=>{
+          const ph=phaseByCode(d.code);
+          const hi = d.code===worst.code;
+          return `<tr class="${hi?'hi':''}">
+            <td style="width:46%">
+              <span class="mono" style="color:var(--ink-soft); margin-right:8px;">${d.code}</span>${ph.label}
+              <div class="bar-outer"><div class="bar-inner ${hi?'hi':''}" style="width:${d.avg? (d.avg/maxAvg*100):0}%"></div></div>
+            </td>
+            <td style="width:18%; text-align:left; color:var(--ink-soft); font-size:12px;">${d.active} actief · oudste ${d.oldest}d</td>
+            <td>${d.avg!=null ? d.avg.toFixed(1).replace('.',',')+' dagen' : '—'}</td>
+          </tr>`;
+        }).join('')}
+      </table>
+    </div>
+  `;
+}
+
+/* ============================================================
+   VIEW: SETTINGS / FASE-MAPPING
+   ============================================================ */
+function viewSettings(){
+  const unmapped = PROJECTS.filter(p=>p.unknownPhase);
+  return `
+    <div class="pagehead">
+      <h1>Fase-instellingen</h1>
+      <div class="desc">De zeven Teamleader-fasen zijn standaard 1-op-1 gekoppeld. Er wordt geen alternatieve of extra fasenstructuur geïntroduceerd. Nieuwe of hernoemde Teamleader-fasen kunnen hieronder gekoppeld worden zodra ze opduiken.</div>
+    </div>
+
+    <div class="section-title">TEAMLEADER-KOPPELING</div>
+    <div class="panel" style="margin-bottom:24px;">
+      <h3>Backend-verbinding</h3>
+      ${state.connected ? `
+        <div style="display:flex; align-items:center; gap:10px; font-size:13px;">
+          <span class="badge ok">Live verbonden</span>
+          <span class="mono" style="color:var(--ink-soft);">${state.apiBase}</span>
+          <button class="pill-btn" data-disconnect style="margin-left:auto;">Ontkoppelen (terug naar demo)</button>
+        </div>
+        <div style="font-size:11.5px; color:var(--slate); margin-top:8px;">Alle schermen tonen nu echte Teamleader-data via deze backend.</div>
+      ` : `
+        <div style="font-size:13px; color:var(--ink-soft); margin-bottom:10px;">
+          Momenteel in <b>demo-modus</b> (illustratieve voorbeelddata). Vul hieronder het adres in waar
+          jullie <span class="mono">ecofinity-integration</span>-backend draait om over te schakelen op echte Teamleader-data.
+        </div>
+        <div style="display:flex; gap:10px;">
+          <input type="text" id="backendUrlInput" placeholder="bv. http://localhost:4000 of https://cockpit-api.ecofinity.be"
+            value="${state.apiBase}"
+            style="flex:1; font-family:'IBM Plex Mono'; font-size:12.5px; padding:8px 10px; border:1px solid var(--line-strong); background:var(--paper-raised);">
+          <button class="pill-btn" data-connect>Verbinden</button>
+        </div>
+        ${state.connectionError ? `<div class="warnbox crit" style="margin-top:10px;">⚠ Kon niet verbinden: ${state.connectionError}. Controleer of de backend draait en CORS toestaat.</div>` : ''}
+      `}
+    </div>
+
+    <div class="section-title">FASE-MAPPING</div>
+    <table class="map-table">
+      <thead><tr><th>Teamleader-fase</th><th></th><th>Gekoppeld aan</th><th></th></tr></thead>
+      <tbody>
+        ${PHASES.map(ph=>`<tr><td class="mono">${ph.code} — ${ph.label}</td><td class="arrow">→</td><td>${ph.label}</td><td></td></tr>`).join('')}
+        ${unmapped.map(p=>`
+          <tr class="unmapped-row">
+            <td class="mono">⚠ ${p.unknownPhase}</td>
+            <td class="arrow">→</td>
+            <td style="color:var(--ink-soft);">nog niet gekoppeld</td>
+            <td>${state.connected
+                ? `<button class="pill-btn" data-map-phase="${p.unknownPhase}">Koppel fase</button>`
+                : `<button class="pill-btn" disabled title="Enkel mogelijk met een live backend-koppeling">Koppel fase</button>`}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <div class="section-title">DEADLINE-ALERTS — GRENSWAARDEN</div>
+    <div class="panel">
+      <h3>Aandacht-drempel</h3>
+      <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:var(--ink-soft);">
+        Toon status <span class="badge warn" style="margin:0 2px;">Aandacht</span> wanneer de opleverdatum van de actieve fase binnen
+        <input type="number" id="thresholdInput" value="${CONFIG.attentionThresholdDays}" min="1" max="30"
+          style="width:52px; font-family:'IBM Plex Mono'; font-size:13px; padding:4px 6px; border:1px solid var(--line-strong); text-align:center;">
+        dagen valt.
+      </div>
+      <div style="font-size:11.5px; color:var(--slate); margin-top:8px;">Wijzigingen worden meteen toegepast op dashboard, wachtrij en kanban.${state.connected ? ' Bij een live koppeling wordt dit ook op de backend bewaard.' : ''}</div>
+    </div>
+  `;
+}
+
+/* ============================================================
+   VIEW: PROJECT DETAIL
+   ============================================================ */
+function viewDetail(){
+  const p = PROJECTS.find(x=>x.id===state.selectedId);
+  if(!p) return `<div class="pagehead"><h1>Project niet gevonden</h1></div>`;
+  const st = deadlineStatus(p);
+
+  const warnings = [];
+  if(p.missingProject) warnings.push({crit:true, text:`Deal ${p.dealId} is gewonnen op ${fmt(p.dealClosedAt)}, maar er is nog geen gekoppeld Teamleader-project. De planningswachtrij en projectfasen kunnen pas gevuld worden zodra de koppeling deal → project gemaakt is.`});
+  if(p.unknownPhase) warnings.push({crit:false, text:`Onbekende projectfase in Teamleader: "${p.unknownPhase}". Fase wordt getoond zoals ze in Teamleader staat, niet genegeerd.`});
+  if(p.dataIssue) warnings.push({crit:true, text:'Projectfasen lijken inconsistent: '+p.dataIssue});
+  if(p.hold) warnings.push({crit:false, text:`On hold — ${p.hold.reason}: ${p.hold.note}`});
+  if(p.currentPhaseCode==='05' && !p.installation) warnings.push({crit:true, text:'Uitvoering staat als ingepland, maar er werd geen planningsafspraak gevonden.'});
+
+  return `
+    <button class="backlink" data-back>← Terug naar wachtrij</button>
+    <div class="detail-head">
+      <h2>${p.customer.toUpperCase()}</h2>
+      <div class="type">${p.type}</div>
+      <div class="detail-grid">
+        <div><div class="k">DEAL</div><div class="v" style="font-size:13px;">${p.dealId}<div class="sub" style="font-weight:400;">gewonnen ${fmt(p.dealClosedAt)}</div></div></div>
+        <div><div class="k">GEKOPPELD PROJECT</div><div class="v" style="font-size:13px;">${p.projectId ? p.projectId : '⚠ geen koppeling'}</div></div>
+        <div><div class="k">BESTELPRIORITEIT</div><div class="v">#${String(p.priority).padStart(3,'0')}</div></div>
+        <div><div class="k">HUIDIGE FASE</div><div class="v">${phaseLabelOf(p)}${p.currentPhaseCode ? `<div class="sub" style="font-weight:400;">${daysInPhase(p)} dagen in fase</div>` : ''}</div></div>
+      </div>
+    </div>
+    ${warnings.map(w=>`<div class="warnbox ${w.crit?'crit':''}">⚠ ${w.text}</div>`).join('')}
+    ${p.installation ? `
+      <div class="panel" style="margin-bottom:18px;">
+        <h3>Uitvoeringsafspraak</h3>
+        <div class="detail-grid" style="grid-template-columns:repeat(4,1fr); border:none; margin:0; padding:0;">
+          <div><div class="k">INSTALLATIEDATUM</div><div class="v">${fmt(p.installation.date)}</div></div>
+          <div><div class="k">START</div><div class="v">${p.installation.start}</div></div>
+          <div><div class="k">EINDE</div><div class="v">${p.installation.end}</div></div>
+          <div><div class="k">TEAM</div><div class="v" style="font-size:13px;">${p.installation.team}</div></div>
+        </div>
+      </div>` : ''}
+    <div class="section-title">WERKOVERZICHT (RECHTSTREEKS UIT TEAMLEADER)</div>
+    ${renderWorkOverview(p)}
+
+    <div class="section-title">PROJECTVERLOOP</div>
+    <div class="timeline">
+      ${PHASES.map(ph=>{
+        const hist = p.history && p.history[ph.code];
+        const isCurrent = p.currentPhaseCode===ph.code;
+        const done = hist && hist.done;
+        const cls = done ? 'done' : (isCurrent ? 'current' : 'todo');
+        const mark = done ? '✓' : (isCurrent ? '●' : '○');
+        let info = '';
+        if(done) info = `klaar ${fmt(hist.date)}`;
+        else if(isCurrent) info = `${daysInPhase(p)} dagen actief${p.deadlines[ph.code] ? ' · deadline '+fmt(p.deadlines[ph.code]) : ''}`;
+        else if(p.deadlines[ph.code]) info = `deadline ${fmt(p.deadlines[ph.code])}`;
+        return `
+        <div class="tstep ${cls}">
+          <div class="mark">${mark}</div>
+          <div class="body">
+            <span class="code">${ph.code}</span><span class="label">${ph.label}</span>
+            ${info ? `<div class="info">${info}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderWorkOverview(p){
+  return `
+  <table class="workoverview" style="margin-bottom:24px;">
+    <thead><tr><th>Fase</th><th class="num">Geregistreerde tijd</th><th class="num">Geschatte tijd</th><th class="num">Opleverdatum</th></tr></thead>
+    <tbody>
+      ${PHASES.map(ph=>{
+        const hist = p.history && p.history[ph.code];
+        const done = hist && hist.done;
+        const wo = (p.workOverview && p.workOverview[ph.code]) || {reg:'-', est:'-'};
+        const oplever = done ? `<span class="pill-klaar">Klaar</span>` : (p.deadlines[ph.code] ? fmt(p.deadlines[ph.code]) : '—');
+        return `<tr>
+          <td class="${done?'phase-done':''}">${ph.label}</td>
+          <td class="num">${wo.reg}</td>
+          <td class="num">${wo.est}</td>
+          <td class="num">${oplever}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+/* ============================================================
+   RENDER + EVENTS
+   ============================================================ */
+function render(){
+  renderNav();
+  renderConnectionBadge();
+  const main = document.getElementById('main');
+  let html = '';
+  switch(state.view){
+    case 'dashboard': html = viewDashboard(); break;
+    case 'queue': html = viewQueue(); break;
+    case 'planning': html = viewPlanning(); break;
+    case 'kanban': html = viewKanban(); break;
+    case 'duration': html = viewDuration(); break;
+    case 'settings': html = viewSettings(); break;
+    case 'detail': html = viewDetail(); break;
+    default: html = viewDashboard();
+  }
+  main.innerHTML = html;
+
+  main.querySelectorAll('[data-kpi]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const f = JSON.parse(el.dataset.kpi);
+      goTo('queue', f);
+    });
+  });
+  main.querySelectorAll('[data-open]').forEach(el=>{
+    el.addEventListener('click', ()=> openProject(el.dataset.open));
+  });
+  const back = main.querySelector('[data-back]');
+  if(back) back.addEventListener('click', ()=> goTo('queue', state.filter));
+  const clear = main.querySelector('[data-clearfilter]');
+  if(clear) clear.addEventListener('click', (e)=>{ e.stopPropagation(); goTo('queue', null); });
+
+  const search = main.querySelector('#searchInput');
+  if(search){
+    search.addEventListener('input', ()=>{ state.search = search.value; render(); search2Focus(); });
+  }
+  const closedToggle = main.querySelector('#showClosedToggle');
+  if(closedToggle) closedToggle.addEventListener('change', ()=>{ state.showClosed = closedToggle.checked; render(); });
+
+  const thresholdInput = main.querySelector('#thresholdInput');
+  if(thresholdInput){
+    thresholdInput.addEventListener('change', async ()=>{
+      const v = parseInt(thresholdInput.value,10);
+      if(!(v>0 && v<=30)) return render();
+      CONFIG.attentionThresholdDays = v;
+      if(state.connected){
+        try{
+          await fetch(state.apiBase + '/api/settings/deadline-threshold', {
+            method:'PUT', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ attentionThresholdDays: v })
+          });
+        }catch(err){ /* UI blijft lokaal consistent; volgende sync trekt gelijk */ }
+      }
+      render();
+    });
+  }
+
+  const connectBtn = main.querySelector('[data-connect]');
+  if(connectBtn){
+    connectBtn.addEventListener('click', ()=>{
+      const url = main.querySelector('#backendUrlInput').value.trim();
+      if(url) connectToBackend(url);
+    });
+  }
+  const disconnectBtn = main.querySelector('[data-disconnect]');
+  if(disconnectBtn) disconnectBtn.addEventListener('click', disconnectFromBackend);
+
+  main.querySelectorAll('[data-map-phase]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const alias = btn.dataset.mapPhase;
+      const list = PHASES.map(p=>`${p.code} = ${p.label}`).join('\n');
+      const code = prompt(`Aan welke fasecode moet "${alias}" gekoppeld worden?\n\n${list}\n\nVul de code in (bv. 07):`);
+      if(!code) return;
+      const trimmed = code.trim();
+      if(!PHASES.some(p=>p.code===trimmed)){ alert('Ongeldige fasecode.'); return; }
+      try{
+        await fetch(state.apiBase + '/api/settings/phase-mapping', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ alias, code: trimmed })
+        });
+        await connectToBackend(state.apiBase); // haalt de nu opgeloste fase opnieuw op
+      }catch(err){
+        alert('Kon de koppeling niet opslaan: ' + err.message);
+      }
+    });
+  });
+}
+
+function renderConnectionBadge(){
+  const el = document.getElementById('connectionBadge');
+  if(!el) return;
+  if(state.connected){
+    el.className = 'conn-badge live';
+    el.textContent = '● LIVE — Teamleader';
+  } else if(state.connectionError){
+    el.className = 'conn-badge error';
+    el.textContent = '⚠ VERBINDING MISLUKT';
+  } else {
+    el.className = 'conn-badge demo';
+    el.textContent = '○ DEMO-MODUS (mockdata)';
+  }
+}
+
+/* houdt focus + cursorpositie in de zoekbalk vast na elke render */
+function search2Focus(){
+  const el = document.getElementById('searchInput');
+  if(el){ el.focus(); const v=el.value; el.value=''; el.value=v; }
+}
+
+render();
+</script>
+</body>
+</html>
