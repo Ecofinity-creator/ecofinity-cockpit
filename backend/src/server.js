@@ -22,7 +22,21 @@ async function main() {
     dataProvider = new MockDataProvider();
   } else {
     console.log('▶ LIVE-modus — koppelt met Postgres + Teamleader.');
+    const fs = require('fs');
+    const path = require('path');
     const pool = require('./db/pool');
+
+    // Automatische migratie: het schema gebruikt overal CREATE TABLE IF NOT EXISTS, dus dit
+    // is veilig om bij elke opstart opnieuw te draaien. Bespaart een handmatige psql-stap.
+    try {
+      const schemaSql = fs.readFileSync(path.join(__dirname, 'db', 'schema.sql'), 'utf8');
+      await pool.query(schemaSql);
+      console.log('▶ Databaseschema gecontroleerd/aangemaakt.');
+    } catch (err) {
+      console.error('Kon databaseschema niet toepassen:', err.message);
+      throw err;
+    }
+
     const SettingsRepo = require('./db/repositories/settingsRepo');
     const DealsRepo = require('./db/repositories/dealsRepo');
     const ProjectsRepo = require('./db/repositories/projectsRepo');

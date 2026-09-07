@@ -52,7 +52,8 @@ inconsistentie-detectie), deadline-status, en de instellingen-endpoints draaien.
 2. Vul `.env` aan met `TEAMLEADER_CLIENT_ID`, `TEAMLEADER_CLIENT_SECRET`,
    `PUBLIC_BASE_URL`, een willekeurige `WEBHOOK_SECRET_PATH`, en `DATABASE_URL`.
 3. Zet `MOCK_MODE=false`.
-4. Maak de database aan en voer het schema uit: `psql $DATABASE_URL -f src/db/schema.sql`.
+4. Maak de database aan (het schema wordt automatisch aangemaakt/gecontroleerd bij het
+   opstarten van de server — geen handmatige `psql`-stap nodig).
 5. Start de server: `node src/server.js`.
 6. Rond de koppeling af door in de browser naar `<PUBLIC_BASE_URL>/oauth/authorize` te gaan.
 7. Registreer de webhooks: `curl -X POST <PUBLIC_BASE_URL>/admin/register-webhooks`.
@@ -69,9 +70,12 @@ RPC-endpoints, OAuth2-flow, paginering, rate-limiting en het bestaan van
 enz. Een paar dingen zijn accountspecifiek en dus best te verifiëren zodra jullie
 marketplace-app actief is (in de code gemarkeerd met `LET OP` / `te bevestigen`):
 
-1. **Deal → project-koppeling** (`src/sync/syncEngine.js#_resolveLinkedProjectId`) —
-   sommige Teamleader-accounts leggen dit vast via een custom field op de deal, andere via
-   een directe API-relatie. Moet éénmalig bevestigd worden tegen jullie eigen account.
+1. **Deal → project-koppeling** (`src/teamleader/projectsApi.js#findProjectIdByDealId`) —
+   gebruikt de `deal_id`-filter op de projects-listing (bevestigd aanwezig in de
+   Teamleader-API-referentie). Als jullie account de koppeling toch via een custom field
+   legt in plaats van deze directe filter, geeft deze functie stelselmatig `null` terug
+   (= "Project ontbreekt" in de cockpit) — dat is dan het signaal om dit aan te passen naar
+   een lookup op dat custom field in plaats van de `deal_id`-filter.
 2. **Exacte veldnamen** voor opleverdatum/geschatte/geregistreerde tijd op milestones
    resp. projectGroups (`src/teamleader/projectsApi.js`) — de aanwezigheid van deze data is
    bevestigd in de Teamleader-changelog, de exacte JSON-sleutels zijn best-effort en te

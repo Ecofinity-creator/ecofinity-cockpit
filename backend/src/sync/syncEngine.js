@@ -115,15 +115,14 @@ class SyncEngine {
   async _resolveLinkedProjectId(deal) {
     if (deal.project_id) return deal.project_id; // sommige accounts exposeren dit rechtstreeks
 
-    // BELANGRIJK — te bevestigen bij implementatie: Teamleader's deals.info levert niet in
-    // elk account een directe project-relatie. Ecofinity's koppeling loopt mogelijk via:
-    //   (a) een custom field op de deal (bv. "Projectnummer"), of
-    //   (b) projects-v2/projects.list gefilterd op deal_id / customer, of
-    //   (c) de "add_project_deal" koppeling die zichtbaar is als relatie op het project.
-    // Vervang onderstaande stub door de effectieve lookup zodra bevestigd welke van de drie
-    // Ecofinity gebruikt. Tot dan geeft dit null terug -> het record verschijnt correct
-    // onder "Project ontbreekt" i.p.v. een foute koppeling te verzinnen.
-    return null;
+    try {
+      return await this.projectsApi.findProjectIdByDealId(deal.id);
+    } catch (err) {
+      // Als de deal_id-filter voor dit account/deze module onverwacht faalt, geen koppeling
+      // verzinnen: het record verschijnt dan terecht onder "Project ontbreekt".
+      console.error(`[sync] kon project voor deal ${deal.id} niet opzoeken via deal_id-filter:`, err.message);
+      return null;
+    }
   }
 
   /** Herberekent de bestelprioriteit (sectie 6/12: volgorde = datum deal gewonnen). */

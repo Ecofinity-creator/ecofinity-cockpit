@@ -87,6 +87,19 @@ class ProjectsApi {
 
     return { id: project.id, title: project.title, phases };
   }
+
+  /**
+   * Zoekt het Teamleader-project dat aan een gegeven deal gekoppeld is via de `deal_id`-filter
+   * op de projects-listing (bevestigd aanwezig in de Teamleader-API-referentie als filterbaar
+   * veld). Bestaat er geen koppeling, dan geeft dit null terug — het record verschijnt dan
+   * terecht onder "Project ontbreekt" in plaats van een foute koppeling te verzinnen.
+   */
+  async findProjectIdByDealId(dealId) {
+    const version = await this.detectModuleVersion();
+    const resource = version === 'v2' ? 'projects-v2/projects' : 'projects';
+    const results = await this.client.listAll(resource, { filter: { deal_id: dealId }, pageSize: 1 });
+    return results[0] ? results[0].id : null;
+  }
 }
 
 module.exports = ProjectsApi;
