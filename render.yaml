@@ -1,0 +1,14 @@
+services:
+  - type: web
+    runtime: node
+    name: ecofinity-cockpit-backend
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node src/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: MOCK_MODE
+        value: "true"
+      - key: POLL_INTERVAL_MINUTES
+        value: "15"
