@@ -1,5 +1,9 @@
 const { deriveCurrentProjectPhase, resolvePhaseCode } = require('../phases/phaseModel');
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Orkestreert de volledige sync-stroom, exact volgens sectie 17 van de spec:
  *
@@ -35,6 +39,10 @@ class SyncEngine {
         console.error(`[sync] deal ${deal.id} mislukt:`, err.message);
         await this.settingsRepo.logSyncIssue(deal.id, err.message);
       }
+      // Kleine pauze tussen elke deal (elk goed voor 3-4 API-calls): voorkomt dat we de
+      // rate limit proactief opbouwen bij een grote sync, in plaats van enkel achteraf te
+      // moeten herstellen via de retry-logica in TeamleaderClient.
+      await sleep(300);
     }
 
     await this.settingsRepo.setLastSyncTimestamp(new Date().toISOString());
