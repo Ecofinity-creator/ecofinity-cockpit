@@ -10,14 +10,16 @@ class DealsApi {
 
   /** Alle gewonnen deals, optioneel enkel de sinds de vorige sync gewijzigde (incrementele sync). */
   async listWonDeals({ updatedSince } = {}) {
-    const filter = { status: 'won' };
+    const filter = { status: ['won'] }; // status-filter MOET een array zijn, bevestigd in de API-referentie
     if (updatedSince) filter.updated_since = updatedSince;
 
     // sideload het gekoppelde project (indien Teamleader dit als relatie op de deal blootstelt)
     // en de customer, zodat we niet voor elke deal een extra call moeten doen.
+    // Sorteren kan bij deals enkel op 'created_at' of 'weighted_value' — 'closed_at' bestaat niet
+    // als sorteerveld (al gebruiken we closed_at wel als besteldatum-veld op de deal zelf).
     return this.client.listAll('deals', {
       filter,
-      sort: [{ field: 'closed_at', order: 'desc' }],
+      sort: [{ field: 'created_at', order: 'desc' }],
       include: 'lead.customer',
     });
   }
