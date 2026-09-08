@@ -74,10 +74,34 @@ async function main() {
       }
     });
 
-    app.post('/admin/sync-now', async (req, res) => {
+    app.post('/admin/sync-now', (req, res) => {
+      // Bewust NIET awaiten: bij veel gewonnen deals (elk met een project-lookup + fase-ophaling)
+      // kan een volledige sync makkelijk langer duren dan de time-out van Render's reverse proxy,
+      // wat het HTTP-verzoek zou doen mislukken terwijl de sync zelf prima verderloopt. We geven
+      // dus meteen een bevestiging terug en laten de sync op de achtergrond afronden; het resultaat
+      // is nadien te zien in de Render-logs of gewoon door /api/cockpit-data opnieuw te bevragen.
+      res.status(202).json({
+        started: true,
+        message: 'Synchronisatie gestart op de achtergrond. Controleer de logs voor het resultaat, of bevraag /api/cockpit-data na enkele minuten.',
+      });
+      syncEngine
+        .syncAll({ incremental: req.query.full !== 'true' })
+        .then((result) => console.log('[admin] handmatige sync afgerond:', result))
+        .catch((err) => console.error('[admin] handmatige sync mislukt:', err.message));
+    });
+
+    app.get('/admin/sync-status', async (req, res) => {
       try {
-        const result = await syncEngine.syncAll({ incremental: req.query.full !== 'true' });
-        res.json(result);
+        const lastSyncAt = await settingsRepo.getLastSyncTimestamp();
+        const issuesRes = await pool.query(
+          `SELECT deal_id, message, occurred_at FROM sync_issues ORDER BY occurred_at DESC LIMIT 10`
+        );
+        const projectCountRes = await pool.query(`SELECT COUNT(*) FROM deals`);
+        res.json({
+          lastSyncAt,
+          totalDealsInDatabase: Number(projectCountRes.rows[0].count),
+          recentIssues: issuesRes.rows,
+        });
       } catch (err) {
         res.status(500).json({ error: err.message });
       }
