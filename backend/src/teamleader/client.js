@@ -17,7 +17,7 @@ class TeamleaderClient {
     this.tokenStore = tokenStore; // levert een geldig access_token, ververst indien nodig
   }
 
-  async call(resourceAction, body = {}, { retries = 3 } = {}) {
+  async call(resourceAction, body = {}, { retries = 3, rateLimitRetries = 12 } = {}) {
     const accessToken = await this.tokenStore.getValidAccessToken();
 
     try {
@@ -32,16 +32,22 @@ class TeamleaderClient {
       if (res.status === 401 && retries > 0) {
         // token bleek toch verlopen/ingetrokken -> forceer refresh en probeer opnieuw
         await this.tokenStore.forceRefresh();
-        return this.call(resourceAction, body, { retries: retries - 1 });
+        return this.call(resourceAction, body, { retries: retries - 1, rateLimitRetries });
       }
 
       if (res.status === 429) {
-        const resetAt = res.headers['x-ratelimit-reset'];
-        const waitMs = resetAt ? Math.max(0, new Date(resetAt).getTime() - Date.now()) : 2000;
-        if (retries > 0) {
-          await sleep(Math.min(waitMs, 15000));
-          return this.call(resourceAction, body, { retries: retries - 1 });
+        // Rate limits zijn een NORMALE, verwachte situatie bij een grote sync (bv. de eerste
+        // volledige sync met honderd+ deals) — geen echte fout. We wachten daarom gewoon de
+        // volledige tijd tot de teller opnieuw vrijgeeft (geen willekeurige cap op de wachttijd),
+        // met een apart, ruimer aantal pogingen dan bij echte fouten.
+        if (rateLimitRetries <= 0) {
+          throw Object.assign(new Error(`Teamleader API-fout op ${resourceAction}: rate limit bleef aanhouden na herhaalde pogingen (HTTP 429)`), { status: 429 });
         }
+        const resetAt = res.headers['x-ratelimit-reset'];
+        const waitMs = resetAt ? Math.max(1000, new Date(resetAt).getTime() - Date.now() + 500) : 10000;
+        console.log(`[rate-limit] ${resourceAction}: wacht ${Math.round(waitMs / 1000)}s tot de teller vrijgeeft (${rateLimitRetries} pogingen resterend)`);
+        await sleep(waitMs);
+        return this.call(resourceAction, body, { retries, rateLimitRetries: rateLimitRetries - 1 });
       }
 
       if (res.status >= 400) {
