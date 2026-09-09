@@ -28,7 +28,8 @@ class SyncEngine {
     this.dealsRepo = dealsRepo;
     this.projectsRepo = projectsRepo;
     this.settingsRepo = settingsRepo;
-    this._syncing = false; // vergrendeling: voorkomt overlappende syncs (poll + handmatige trigger)
+    this._syncing = false; // vergrendeling: voorkomt overlappende syncAll()-aanroepen (poll + handmatige trigger)
+    this._dealLocks = new Set(); // vergrendeling per deal: voorkomt races tussen webhook-triggers en de bulk-wachtrij
   }
 
   /**
@@ -110,6 +111,23 @@ class SyncEngine {
 
   /** Sync van precies één deal — gebruikt zowel door de volledige poll als door webhook-triggers. */
   async syncOneDeal(dealId) {
+    // Voorkomt een race waarbij een live webhook-event (bv. deal.updated, die op elk moment
+    // kan binnenkomen) en de bulk-wachtrij toevallig dezelfde deal tegelijk verwerken, met als
+    // risico dat het ene traject "geen project" schrijft net nadat het andere "wel een project"
+    // had gecommit — precies het soort inconsistentie dat hierboven in de cockpit-data opdook.
+    if (this._dealLocks.has(dealId)) {
+      console.log(`[sync] deal ${dealId} wordt al elders verwerkt, deze aanroep overgeslagen.`);
+      return;
+    }
+    this._dealLocks.add(dealId);
+    try {
+      await this._syncOneDealUnlocked(dealId);
+    } finally {
+      this._dealLocks.delete(dealId);
+    }
+  }
+
+  async _syncOneDealUnlocked(dealId) {
     const deal = await this.dealsApi.getDeal(dealId);
 
     const dealRecord = {
