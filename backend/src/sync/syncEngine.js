@@ -21,32 +21,42 @@ class SyncEngine {
     this.dealsRepo = dealsRepo;
     this.projectsRepo = projectsRepo;
     this.settingsRepo = settingsRepo;
+    this._syncing = false; // vergrendeling: voorkomt overlappende syncs (poll + handmatige trigger)
   }
 
   /** Volledige of incrementele sync van alle gewonnen deals + hun gekoppelde project. */
   async syncAll({ incremental = true } = {}) {
-    const lastSync = incremental ? await this.settingsRepo.getLastSyncTimestamp() : null;
-    const deals = await this.dealsApi.listWonDeals(lastSync ? { updatedSince: lastSync } : {});
-
-    let ok = 0;
-    let failed = 0;
-    for (const deal of deals) {
-      try {
-        await this.syncOneDeal(deal.id);
-        ok += 1;
-      } catch (err) {
-        failed += 1;
-        console.error(`[sync] deal ${deal.id} mislukt:`, err.message);
-        await this.settingsRepo.logSyncIssue(deal.id, err.message);
-      }
-      // Kleine pauze tussen elke deal (elk goed voor 3-4 API-calls): voorkomt dat we de
-      // rate limit proactief opbouwen bij een grote sync, in plaats van enkel achteraf te
-      // moeten herstellen via de retry-logica in TeamleaderClient.
-      await sleep(300);
+    if (this._syncing) {
+      console.log('[sync] overgeslagen: er loopt al een synchronisatie (voorkomt dubbele API-belasting/rate limits).');
+      return { skipped: true, reason: 'sync already in progress' };
     }
+    this._syncing = true;
+    try {
+      const lastSync = incremental ? await this.settingsRepo.getLastSyncTimestamp() : null;
+      const deals = await this.dealsApi.listWonDeals(lastSync ? { updatedSince: lastSync } : {});
 
-    await this.settingsRepo.setLastSyncTimestamp(new Date().toISOString());
-    return { dealsProcessed: deals.length, ok, failed };
+      let ok = 0;
+      let failed = 0;
+      for (const deal of deals) {
+        try {
+          await this.syncOneDeal(deal.id);
+          ok += 1;
+        } catch (err) {
+          failed += 1;
+          console.error(`[sync] deal ${deal.id} mislukt:`, err.message);
+          await this.settingsRepo.logSyncIssue(deal.id, err.message);
+        }
+        // Kleine pauze tussen elke deal (elk goed voor 3-4 API-calls): voorkomt dat we de
+        // rate limit proactief opbouwen bij een grote sync, in plaats van enkel achteraf te
+        // moeten herstellen via de retry-logica in TeamleaderClient.
+        await sleep(500);
+      }
+
+      await this.settingsRepo.setLastSyncTimestamp(new Date().toISOString());
+      return { dealsProcessed: deals.length, ok, failed };
+    } finally {
+      this._syncing = false;
+    }
   }
 
   /** Sync van precies één deal — gebruikt zowel door de volledige poll als door webhook-triggers. */
