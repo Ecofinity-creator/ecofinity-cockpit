@@ -69,7 +69,7 @@ class SyncEngine {
           console.error(`[sync] deal ${dealId} mislukt:`, err.message);
           await this.settingsRepo.logSyncIssue(dealId, err.message);
         }
-        await sleep(1500);
+        await sleep(500); // extra kleine marge boven op de globale doorvoerbeperking in de client
       }
 
       await this.settingsRepo.setPendingSyncQueue(rest);
