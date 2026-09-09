@@ -4,6 +4,13 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Aantal deals per portie. Render's gratis laag lijkt achtergrondwerk niet onbeperkt lang
+// te garanderen als er geen actief HTTP-verzoek meer loopt; door in kleine porties te werken
+// (in plaats van in één keer alle 100+ deals te verwerken) blijft elke aanroep kort genoeg
+// om altijd volledig af te ronden, en bouwt de voortgang betrouwbaar op over meerdere
+// aanroepen heen — via herhaalde handmatige triggers, of gewoon via de periodieke poll.
+const BATCH_SIZE = 15;
+
 /**
  * Orkestreert de volledige sync-stroom, exact volgens sectie 17 van de spec:
  *
@@ -24,7 +31,12 @@ class SyncEngine {
     this._syncing = false; // vergrendeling: voorkomt overlappende syncs (poll + handmatige trigger)
   }
 
-  /** Volledige of incrementele sync van alle gewonnen deals + hun gekoppelde project. */
+  /**
+   * Verwerkt één portie (BATCH_SIZE) van de openstaande wachtrij deals. Bij een nieuwe of
+   * volledige sync wordt de wachtrij eerst (opnieuw) opgebouwd; bij een lopende sync wordt
+   * gewoon verdergegaan waar de vorige aanroep stopte. `lastSyncAt` wordt pas gezet zodra de
+   * wachtrij volledig leeg is — zo blijft altijd zichtbaar of een sync écht compleet is.
+   */
   async syncAll({ incremental = true } = {}) {
     if (this._syncing) {
       console.log('[sync] overgeslagen: er loopt al een synchronisatie (voorkomt dubbele API-belasting/rate limits).');
@@ -32,28 +44,41 @@ class SyncEngine {
     }
     this._syncing = true;
     try {
-      const lastSync = incremental ? await this.settingsRepo.getLastSyncTimestamp() : null;
-      const deals = await this.dealsApi.listWonDeals(lastSync ? { updatedSince: lastSync } : {});
+      let queue = await this.settingsRepo.getPendingSyncQueue();
+
+      if (!incremental || queue.length === 0) {
+        // Enkel een nieuwe lijst ophalen als er niets meer in de wachtrij staat (of bij een
+        // expliciet volledige sync) — anders bouwen we gewoon verder op het vorige werk.
+        const lastSync = incremental ? await this.settingsRepo.getLastSyncTimestamp() : null;
+        const deals = await this.dealsApi.listWonDeals(lastSync ? { updatedSince: lastSync } : {});
+        queue = deals.map((d) => d.id);
+        await this.settingsRepo.setPendingSyncQueue(queue);
+      }
+
+      const batch = queue.slice(0, BATCH_SIZE);
+      const rest = queue.slice(BATCH_SIZE);
 
       let ok = 0;
       let failed = 0;
-      for (const deal of deals) {
+      for (const dealId of batch) {
         try {
-          await this.syncOneDeal(deal.id);
+          await this.syncOneDeal(dealId);
           ok += 1;
         } catch (err) {
           failed += 1;
-          console.error(`[sync] deal ${deal.id} mislukt:`, err.message);
-          await this.settingsRepo.logSyncIssue(deal.id, err.message);
+          console.error(`[sync] deal ${dealId} mislukt:`, err.message);
+          await this.settingsRepo.logSyncIssue(dealId, err.message);
         }
-        // Kleine pauze tussen elke deal (elk goed voor 3-4 API-calls): voorkomt dat we de
-        // rate limit proactief opbouwen bij een grote sync, in plaats van enkel achteraf te
-        // moeten herstellen via de retry-logica in TeamleaderClient.
         await sleep(500);
       }
 
-      await this.settingsRepo.setLastSyncTimestamp(new Date().toISOString());
-      return { dealsProcessed: deals.length, ok, failed };
+      await this.settingsRepo.setPendingSyncQueue(rest);
+      const queueComplete = rest.length === 0;
+      if (queueComplete) {
+        await this.settingsRepo.setLastSyncTimestamp(new Date().toISOString());
+      }
+
+      return { batchSize: batch.length, ok, failed, remainingInQueue: rest.length, queueComplete };
     } finally {
       this._syncing = false;
     }
