@@ -15,7 +15,34 @@ class LiveDataProvider {
     const dealsRes = await this.pool.query(`SELECT * FROM deals ORDER BY priority_rank ASC NULLS LAST`);
     const views = [];
     for (const deal of dealsRes.rows) {
-      views.push(await this._buildView(deal));
+      try {
+        views.push(await this._buildView(deal));
+      } catch (err) {
+        // Eén onvolledige/inconsistente rij (bv. een deal die halverwege een mislukte sync
+        // zit) mag nooit de volledige cockpit voor alle andere, wél correcte deals platleggen.
+        // We loggen het en tonen dit record als "probleem", in plaats van de hele lijst te
+        // laten crashen.
+        console.error(`[cockpit-data] kon deal ${deal.deal_id} niet opbouwen, sla over:`, err.message);
+        views.push({
+          dealId: deal.deal_id,
+          projectId: null,
+          priority: deal.priority_rank,
+          customer: deal.customer,
+          type: deal.title,
+          dealClosedAt: toDateStr(deal.deal_closed_at),
+          phaseEnteredDate: null,
+          history: {},
+          deadlines: {},
+          workOverview: {},
+          installation: null,
+          hold: null,
+          missingProject: false,
+          currentPhaseCode: null,
+          closed: false,
+          dataIssue: `Kon dit record niet volledig laden: ${err.message}`,
+          unknownPhaseLabel: null,
+        });
+      }
     }
     return views;
   }
@@ -51,6 +78,12 @@ class LiveDataProvider {
 
     const projRes = await this.pool.query(`SELECT * FROM projects WHERE deal_id = $1`, [deal.deal_id]);
     const project = projRes.rows[0];
+    if (!project) {
+      // has_linked_project staat op TRUE, maar de bijhorende projects-rij ontbreekt —
+      // een inconsistentie die niet zou mogen voorkomen (upsertProjectSnapshot zet beide
+      // atomisch samen), maar we crashen hier niet blindelings op als het toch gebeurt.
+      throw new Error(`deal.has_linked_project=true maar geen projects-rij gevonden voor deal ${deal.deal_id}`);
+    }
 
     const phaseRes = await this.pool.query(
       `SELECT * FROM project_phase_history WHERE project_id = $1 ORDER BY phase_code ASC`,
