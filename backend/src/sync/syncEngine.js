@@ -69,7 +69,7 @@ class SyncEngine {
           console.error(`[sync] deal ${dealId} mislukt:`, err.message);
           await this.settingsRepo.logSyncIssue(dealId, err.message);
         }
-        await sleep(500);
+        await sleep(1500);
       }
 
       await this.settingsRepo.setPendingSyncQueue(rest);
@@ -82,6 +82,30 @@ class SyncEngine {
     } finally {
       this._syncing = false;
     }
+  }
+
+  /**
+   * Blijft porties verwerken tot de wachtrij volledig leeg is, met een korte pauze ertussen.
+   * Draait volledig verder op de achtergrond in dit Node-proces — er hoeft geen HTTP-verzoek
+   * open te blijven staan. Bij een grote initiële wachtrij (honderden/duizenden historische
+   * deals) kan dit een tijd duren; dat is de bedoeling, in plaats van in één keer te veel te
+   * willen doen en halverwege vast te lopen.
+   */
+  async runUntilQueueEmpty({ incremental = true } = {}) {
+    let first = true;
+    let result;
+    do {
+      // eslint-disable-next-line no-await-in-loop
+      result = await this.syncAll({ incremental: first ? incremental : true });
+      first = false;
+      console.log('[sync] portie verwerkt:', result);
+      if (result.skipped) break; // een andere sync (bv. de periodieke poll) is al bezig
+      if (!result.queueComplete) {
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(3000);
+      }
+    } while (!result.queueComplete);
+    return result;
   }
 
   /** Sync van precies één deal — gebruikt zowel door de volledige poll als door webhook-triggers. */
