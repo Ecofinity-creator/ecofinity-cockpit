@@ -75,30 +75,33 @@ async function main() {
     });
 
     app.post('/admin/sync-now', (req, res) => {
-      // Bewust NIET awaiten: bij veel gewonnen deals (elk met een project-lookup + fase-ophaling)
-      // kan een volledige sync makkelijk langer duren dan de time-out van Render's reverse proxy,
-      // wat het HTTP-verzoek zou doen mislukken terwijl de sync zelf prima verderloopt. We geven
-      // dus meteen een bevestiging terug en laten de sync op de achtergrond afronden; het resultaat
-      // is nadien te zien in de Render-logs of gewoon door /api/cockpit-data opnieuw te bevragen.
+      // Bewust NIET awaiten: dit verwerkt telkens één portie (zie BATCH_SIZE in syncEngine.js)
+      // en antwoordt meteen. Bij een grote wachtrij (bv. de allereerste sync) moet je dit
+      // gewoon herhaaldelijk aanroepen — elke aanroep verwerkt een nieuwe portie, tot de
+      // wachtrij leeg is. De periodieke poll (elke POLL_INTERVAL_MINUTES) doet dit ook
+      // automatisch, dus zelfs zonder handmatig te herhalen raakt de wachtrij vanzelf leeg.
       res.status(202).json({
         started: true,
-        message: 'Synchronisatie gestart op de achtergrond. Controleer de logs voor het resultaat, of bevraag /api/cockpit-data na enkele minuten.',
+        message: 'Eén portie van de synchronisatie gestart op de achtergrond. Bevraag /admin/sync-status om de voortgang (remainingInQueue) te volgen; roep dit endpoint gerust herhaaldelijk aan tot de wachtrij leeg is.',
       });
       syncEngine
         .syncAll({ incremental: req.query.full !== 'true' })
-        .then((result) => console.log('[admin] handmatige sync afgerond:', result))
-        .catch((err) => console.error('[admin] handmatige sync mislukt:', err.message));
+        .then((result) => console.log('[admin] portie afgerond:', result))
+        .catch((err) => console.error('[admin] portie mislukt:', err.message));
     });
 
     app.get('/admin/sync-status', async (req, res) => {
       try {
         const lastSyncAt = await settingsRepo.getLastSyncTimestamp();
+        const pendingQueue = await settingsRepo.getPendingSyncQueue();
         const issuesRes = await pool.query(
           `SELECT deal_id, message, occurred_at FROM sync_issues ORDER BY occurred_at DESC LIMIT 10`
         );
         const projectCountRes = await pool.query(`SELECT COUNT(*) FROM deals`);
         res.json({
           lastSyncAt,
+          syncComplete: pendingQueue.length === 0 && !!lastSyncAt,
+          remainingInQueue: pendingQueue.length,
           totalDealsInDatabase: Number(projectCountRes.rows[0].count),
           recentIssues: issuesRes.rows,
         });
