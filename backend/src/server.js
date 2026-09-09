@@ -75,19 +75,18 @@ async function main() {
     });
 
     app.post('/admin/sync-now', (req, res) => {
-      // Bewust NIET awaiten: dit verwerkt telkens één portie (zie BATCH_SIZE in syncEngine.js)
-      // en antwoordt meteen. Bij een grote wachtrij (bv. de allereerste sync) moet je dit
-      // gewoon herhaaldelijk aanroepen — elke aanroep verwerkt een nieuwe portie, tot de
-      // wachtrij leeg is. De periodieke poll (elke POLL_INTERVAL_MINUTES) doet dit ook
-      // automatisch, dus zelfs zonder handmatig te herhalen raakt de wachtrij vanzelf leeg.
+      // Start de volledige, zichzelf herhalende verwerking van de wachtrij op de achtergrond
+      // (zie runUntilQueueEmpty in syncEngine.js) — dit ene verzoek volstaat, ook als er
+      // honderden of duizenden historische deals in de wachtrij staan. Bevraag ondertussen
+      // /admin/sync-status om de voortgang te volgen.
       res.status(202).json({
         started: true,
-        message: 'Eén portie van de synchronisatie gestart op de achtergrond. Bevraag /admin/sync-status om de voortgang (remainingInQueue) te volgen; roep dit endpoint gerust herhaaldelijk aan tot de wachtrij leeg is.',
+        message: 'Synchronisatie gestart op de achtergrond en loopt door tot de volledige wachtrij verwerkt is. Bevraag /admin/sync-status om de voortgang (remainingInQueue) te volgen — dit hoeft maar één keer aangeroepen te worden.',
       });
       syncEngine
-        .syncAll({ incremental: req.query.full !== 'true' })
-        .then((result) => console.log('[admin] portie afgerond:', result))
-        .catch((err) => console.error('[admin] portie mislukt:', err.message));
+        .runUntilQueueEmpty({ incremental: req.query.full !== 'true' })
+        .then((result) => console.log('[admin] volledige synchronisatie afgerond:', result))
+        .catch((err) => console.error('[admin] synchronisatie mislukt:', err.message));
     });
 
     app.get('/admin/sync-status', async (req, res) => {
