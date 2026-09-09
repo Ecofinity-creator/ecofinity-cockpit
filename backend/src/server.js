@@ -56,6 +56,29 @@ async function main() {
     const projectsRepo = new ProjectsRepo(pool);
     dataProvider = new LiveDataProvider(pool, settingsRepo);
 
+    // Eenmalig herstel: corrigeer deals die door een race-conditie tussen webhook-triggers en
+    // de bulk-wachtrij als "has_linked_project=true" staan zonder bijhorende projects-rij
+    // (de vergrendeling in syncEngine.js voorkomt dit voortaan). Idempotent, dus veilig bij
+    // elke opstart. De betrokken deals worden opnieuw in de wachtrij gezet zodat ze — nu zonder
+    // race — een eerlijke herkansing krijgen, in plaats van permanent als "geen project" te blijven staan.
+    try {
+      const repairRes = await pool.query(`
+        UPDATE deals SET has_linked_project = FALSE
+        WHERE has_linked_project = TRUE
+          AND deal_id NOT IN (SELECT deal_id FROM projects)
+        RETURNING deal_id
+      `);
+      if (repairRes.rowCount > 0) {
+        const repairedIds = repairRes.rows.map((r) => r.deal_id);
+        console.log(`▶ ${repairRes.rowCount} inconsistente deal(s) hersteld en opnieuw in de wachtrij gezet.`);
+        const existingQueue = await settingsRepo.getPendingSyncQueue();
+        const merged = Array.from(new Set([...existingQueue, ...repairedIds]));
+        await settingsRepo.setPendingSyncQueue(merged);
+      }
+    } catch (err) {
+      console.error('Kon inconsistente deals niet herstellen (niet-kritiek, ga verder):', err.message);
+    }
+
     const tokenStore = new TokenStore(settingsRepo);
     const client = new TeamleaderClient(tokenStore);
     const dealsApi = new DealsApi(client);
