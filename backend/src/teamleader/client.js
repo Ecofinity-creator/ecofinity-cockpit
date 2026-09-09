@@ -15,9 +15,31 @@ const config = require('../config');
 class TeamleaderClient {
   constructor(tokenStore) {
     this.tokenStore = tokenStore; // levert een geldig access_token, ververst indien nodig
+    // Globale doorvoerbeperking: elke aanroep (van waar in de code ook) wordt hier serieel
+    // doorheen gesluisd met een vaste minimumafstand. Pauzeren enkel tussen deals bleek niet
+    // te volstaan — Teamleader's limiet reageerde blijkbaar op de absolute aanroepfrequentie,
+    // niet enkel op de frequentie per deal.
+    this._queue = Promise.resolve();
+    this._lastCallAt = 0;
+    this._minIntervalMs = 2000;
   }
 
-  async call(resourceAction, body = {}, { retries = 3, rateLimitRetries = 12 } = {}) {
+  async _throttle() {
+    const wait = Math.max(0, this._lastCallAt + this._minIntervalMs - Date.now());
+    if (wait > 0) await sleep(wait);
+    this._lastCallAt = Date.now();
+  }
+
+  call(resourceAction, body = {}, opts = {}) {
+    const run = () => this._throttledCall(resourceAction, body, opts);
+    const result = this._queue.then(run, run);
+    // wachtrij moet blijven doorlopen ook als deze ene aanroep faalt
+    this._queue = result.catch(() => {});
+    return result;
+  }
+
+  async _throttledCall(resourceAction, body, { retries = 3, rateLimitRetries = 12 } = {}) {
+    await this._throttle();
     const accessToken = await this.tokenStore.getValidAccessToken();
 
     try {
@@ -32,22 +54,23 @@ class TeamleaderClient {
       if (res.status === 401 && retries > 0) {
         // token bleek toch verlopen/ingetrokken -> forceer refresh en probeer opnieuw
         await this.tokenStore.forceRefresh();
-        return this.call(resourceAction, body, { retries: retries - 1, rateLimitRetries });
+        return this._throttledCall(resourceAction, body, { retries: retries - 1, rateLimitRetries });
       }
 
       if (res.status === 429) {
-        // Rate limits zijn een NORMALE, verwachte situatie bij een grote sync (bv. de eerste
-        // volledige sync met honderd+ deals) — geen echte fout. We wachten daarom gewoon de
-        // volledige tijd tot de teller opnieuw vrijgeeft (geen willekeurige cap op de wachttijd),
-        // met een apart, ruimer aantal pogingen dan bij echte fouten.
+        // Rate limits zijn een NORMALE, verwachte situatie bij een grote sync — geen echte
+        // fout. De reset-header bleek in de praktijk soms een te korte tijd te melden (de
+        // limiet bleef alsnog aanhouden), daarom leggen we een ondergrens van 8s vast i.p.v.
+        // blind op de header te vertrouwen.
         if (rateLimitRetries <= 0) {
           throw Object.assign(new Error(`Teamleader API-fout op ${resourceAction}: rate limit bleef aanhouden na herhaalde pogingen (HTTP 429)`), { status: 429 });
         }
         const resetAt = res.headers['x-ratelimit-reset'];
-        const waitMs = resetAt ? Math.max(1000, new Date(resetAt).getTime() - Date.now() + 500) : 10000;
+        const headerWaitMs = resetAt ? new Date(resetAt).getTime() - Date.now() + 500 : 0;
+        const waitMs = Math.max(8000, headerWaitMs);
         console.log(`[rate-limit] ${resourceAction}: wacht ${Math.round(waitMs / 1000)}s tot de teller vrijgeeft (${rateLimitRetries} pogingen resterend)`);
         await sleep(waitMs);
-        return this.call(resourceAction, body, { retries, rateLimitRetries: rateLimitRetries - 1 });
+        return this._throttledCall(resourceAction, body, { retries, rateLimitRetries: rateLimitRetries - 1 });
       }
 
       if (res.status >= 400) {
