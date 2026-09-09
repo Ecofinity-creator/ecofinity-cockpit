@@ -58,6 +58,16 @@ class SettingsRepo {
     await this._set('last_sync_at', iso);
   }
 
+  /** Wachtrij van nog te verwerken deal-ID's voor de huidige (mogelijk in porties verwerkte) sync. */
+  async getPendingSyncQueue() {
+    const v = await this._get('pending_sync_deal_ids');
+    return Array.isArray(v) ? v : [];
+  }
+
+  async setPendingSyncQueue(ids) {
+    await this._set('pending_sync_deal_ids', ids);
+  }
+
   async logSyncIssue(dealId, message) {
     await this.pool.query(`INSERT INTO sync_issues (deal_id, message) VALUES ($1, $2)`, [dealId, message]);
   }
