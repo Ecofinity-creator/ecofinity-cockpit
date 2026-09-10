@@ -98,18 +98,20 @@ async function main() {
     });
 
     app.post('/admin/sync-now', (req, res) => {
-      // Start de volledige, zichzelf herhalende verwerking van de wachtrij op de achtergrond
-      // (zie runUntilQueueEmpty in syncEngine.js) — dit ene verzoek volstaat, ook als er
-      // honderden of duizenden historische deals in de wachtrij staan. Bevraag ondertussen
-      // /admin/sync-status om de voortgang te volgen.
+      // BELANGRIJK: dit verwerkt bewust maar ÉÉN portie en stopt dan. Render's gratis laag
+      // zet de service na ~15 minuten zonder inkomend HTTP-verzoek stil, ongeacht of er
+      // intern nog werk loopt -- een aanpak die zelf urenlang op de achtergrond zou
+      // doorlopen zonder nieuwe binnenkomende requests, overleeft dat niet. Roep dit
+      // endpoint dus herhaaldelijk aan (bv. elke 5 minuten) tot de wachtrij leeg is --
+      // handmatig, of automatisch via een gratis externe pingdienst (zie backend/README.md).
       res.status(202).json({
         started: true,
-        message: 'Synchronisatie gestart op de achtergrond en loopt door tot de volledige wachtrij verwerkt is. Bevraag /admin/sync-status om de voortgang (remainingInQueue) te volgen — dit hoeft maar één keer aangeroepen te worden.',
+        message: 'Eén portie van de synchronisatie gestart. Bevraag /admin/sync-status om de voortgang te volgen, en roep dit endpoint herhaaldelijk aan (bv. elke 5 min) tot remainingInQueue op 0 staat.',
       });
       syncEngine
-        .runUntilQueueEmpty({ incremental: req.query.full !== 'true' })
-        .then((result) => console.log('[admin] volledige synchronisatie afgerond:', result))
-        .catch((err) => console.error('[admin] synchronisatie mislukt:', err.message));
+        .syncAll({ incremental: req.query.full !== 'true' })
+        .then((result) => console.log('[admin] portie afgerond:', result))
+        .catch((err) => console.error('[admin] portie mislukt:', err.message));
     });
 
     app.get('/admin/sync-status', async (req, res) => {
