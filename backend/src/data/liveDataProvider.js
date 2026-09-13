@@ -12,18 +12,33 @@ class LiveDataProvider {
   }
 
   async listProjects() {
-    const dealsRes = await this.pool.query(`SELECT * FROM deals ORDER BY priority_rank ASC NULLS LAST`);
-    const views = [];
-    for (const deal of dealsRes.rows) {
+    // Bewust GEEN N+1-lus (één query per deal) meer: bij 1000+ deals liep dat op tot
+    // duizenden sequentiële databasecalls en minutenlange responstijden. In plaats daarvan
+    // halen we alle betrokken tabellen in vier grote queries op en bouwen we de resultaten
+    // in het geheugen samen.
+    const [dealsRes, projectsRes, phaseRes, installRes] = await Promise.all([
+      this.pool.query(`SELECT * FROM deals ORDER BY priority_rank ASC NULLS LAST`),
+      this.pool.query(`SELECT * FROM projects`),
+      this.pool.query(`SELECT * FROM project_phase_history`),
+      this.pool.query(`SELECT * FROM project_installations`),
+    ]);
+
+    const projectByDeal = new Map(projectsRes.rows.map((p) => [p.deal_id, p]));
+    const phasesByProject = new Map();
+    for (const row of phaseRes.rows) {
+      if (!phasesByProject.has(row.project_id)) phasesByProject.set(row.project_id, []);
+      phasesByProject.get(row.project_id).push(row);
+    }
+    const installByProject = new Map(installRes.rows.map((i) => [i.project_id, i]));
+
+    return dealsRes.rows.map((deal) => {
       try {
-        views.push(await this._buildView(deal));
+        return this._buildView(deal, projectByDeal, phasesByProject, installByProject);
       } catch (err) {
         // Eén onvolledige/inconsistente rij (bv. een deal die halverwege een mislukte sync
         // zit) mag nooit de volledige cockpit voor alle andere, wél correcte deals platleggen.
-        // We loggen het en tonen dit record als "probleem", in plaats van de hele lijst te
-        // laten crashen.
         console.error(`[cockpit-data] kon deal ${deal.deal_id} niet opbouwen, sla over:`, err.message);
-        views.push({
+        return {
           dealId: deal.deal_id,
           projectId: null,
           priority: deal.priority_rank,
@@ -41,19 +56,37 @@ class LiveDataProvider {
           closed: false,
           dataIssue: `Kon dit record niet volledig laden: ${err.message}`,
           unknownPhaseLabel: null,
-        });
+        };
       }
-    }
-    return views;
+    });
   }
 
+  /** Enkelvoudige lookup (projectdetailpagina) — hier is de N+1-kost verwaarloosbaar. */
   async getProject(dealId) {
-    const res = await this.pool.query(`SELECT * FROM deals WHERE deal_id = $1`, [dealId]);
-    if (!res.rows[0]) return null;
-    return this._buildView(res.rows[0]);
+    const dealRes = await this.pool.query(`SELECT * FROM deals WHERE deal_id = $1`, [dealId]);
+    const deal = dealRes.rows[0];
+    if (!deal) return null;
+
+    const projRes = await this.pool.query(`SELECT * FROM projects WHERE deal_id = $1`, [dealId]);
+    const project = projRes.rows[0];
+    const projectByDeal = new Map(project ? [[dealId, project]] : []);
+
+    let phasesByProject = new Map();
+    let installByProject = new Map();
+    if (project) {
+      const [phaseRes, installRes] = await Promise.all([
+        this.pool.query(`SELECT * FROM project_phase_history WHERE project_id = $1 ORDER BY phase_code ASC`, [project.project_id]),
+        this.pool.query(`SELECT * FROM project_installations WHERE project_id = $1`, [project.project_id]),
+      ]);
+      phasesByProject = new Map([[project.project_id, phaseRes.rows]]);
+      installByProject = new Map(installRes.rows.map((i) => [i.project_id, i]));
+    }
+
+    return this._buildView(deal, projectByDeal, phasesByProject, installByProject);
   }
 
-  async _buildView(deal) {
+  /** Bouwt één ProjectView op uit reeds opgehaalde (in-memory) tabeldata — geen eigen queries meer. */
+  _buildView(deal, projectByDeal, phasesByProject, installByProject) {
     if (!deal.has_linked_project) {
       return {
         dealId: deal.deal_id,
@@ -76,26 +109,22 @@ class LiveDataProvider {
       };
     }
 
-    const projRes = await this.pool.query(`SELECT * FROM projects WHERE deal_id = $1`, [deal.deal_id]);
-    const project = projRes.rows[0];
+    const project = projectByDeal.get(deal.deal_id);
     if (!project) {
       // has_linked_project staat op TRUE, maar de bijhorende projects-rij ontbreekt —
       // een inconsistentie die niet zou mogen voorkomen (upsertProjectSnapshot zet beide
-      // atomisch samen), maar we crashen hier niet blindelings op als het toch gebeurt.
+      // atomisch samen; de vergrendeling per deal in syncEngine.js voorkomt de race die dit
+      // vroeger veroorzaakte), maar we crashen hier niet blindelings op als het toch gebeurt.
       throw new Error(`deal.has_linked_project=true maar geen projects-rij gevonden voor deal ${deal.deal_id}`);
     }
 
-    const phaseRes = await this.pool.query(
-      `SELECT * FROM project_phase_history WHERE project_id = $1 ORDER BY phase_code ASC`,
-      [project.project_id]
-    );
-
+    const phaseRows = phasesByProject.get(project.project_id) || [];
     const history = {};
     const deadlines = {};
     const workOverview = {};
     let phaseEnteredDate = null;
 
-    for (const row of phaseRes.rows) {
+    for (const row of phaseRows) {
       history[row.phase_code] = { done: row.done, date: toDateStr(row.completed_at) };
       if (row.planned_ends_on) deadlines[row.phase_code] = toDateStr(row.planned_ends_on);
       workOverview[row.phase_code] = {
@@ -107,10 +136,7 @@ class LiveDataProvider {
       }
     }
 
-    const installRes = await this.pool.query(`SELECT * FROM project_installations WHERE project_id = $1`, [
-      project.project_id,
-    ]);
-    const install = installRes.rows[0];
+    const install = installByProject.get(project.project_id);
 
     return {
       dealId: deal.deal_id,
