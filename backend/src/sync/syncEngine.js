@@ -50,9 +50,22 @@ class SyncEngine {
       if (!incremental || queue.length === 0) {
         // Enkel een nieuwe lijst ophalen als er niets meer in de wachtrij staat (of bij een
         // expliciet volledige sync) — anders bouwen we gewoon verder op het vorige werk.
-        const lastSync = incremental ? await this.settingsRepo.getLastSyncTimestamp() : null;
-        const deals = await this.dealsApi.listWonDeals(lastSync ? { updatedSince: lastSync } : {});
-        queue = deals.map((d) => d.id);
+        // De lijst zelf (deals.list) is goedkoop (1-2 snelle, gepagineerde calls, geen rate-limit-
+        // probleem); enkel het per-deal ophalen van projectdata is duur. Daarom filteren we
+        // hier zelf op 'updated_at' i.p.v. te vertrouwen op een server-side filter die niet
+        // bleek te werken zoals verwacht (zie dealsApi.js).
+        const allWonDeals = await this.dealsApi.listWonDeals();
+        let dealsToQueue = allWonDeals;
+
+        if (incremental) {
+          const lastSync = await this.settingsRepo.getLastSyncTimestamp();
+          if (lastSync) {
+            const lastSyncMs = new Date(lastSync).getTime();
+            dealsToQueue = allWonDeals.filter((d) => !d.updated_at || new Date(d.updated_at).getTime() > lastSyncMs);
+          }
+        }
+
+        queue = dealsToQueue.map((d) => d.id);
         await this.settingsRepo.setPendingSyncQueue(queue);
       }
 
