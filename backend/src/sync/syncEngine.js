@@ -132,7 +132,7 @@ class SyncEngine {
 
     const dealRecord = {
       dealId: deal.id,
-      customer: (deal.lead && deal.lead.customer && deal.lead.customer.name) || deal.title,
+      customer: deal._resolvedCustomerName || deal.title,
       title: deal.title,
       dealClosedAt: deal.closed_at, // BESTELDATUM — uitsluitend dit veld, nooit project.created_at
       priorityRank: null, // ingevuld hieronder t.o.v. andere open orders (sectie 6)
