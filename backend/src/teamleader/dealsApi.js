@@ -36,15 +36,17 @@ class DealsApi {
     this.client = client;
   }
 
-  /** Alle gewonnen deals, optioneel enkel de sinds de vorige sync gewijzigde (incrementele sync). */
-  async listWonDeals({ updatedSince } = {}) {
+  /** Alle gewonnen deals. Filteren op "sinds wanneer gewijzigd" gebeurt bewust NIET hier via
+   * een server-side filter — Teamleader's API negeert onbekende filtersleutels stilzwijgend en
+   * geeft dan de volledige, ongefilterde set terug (bevestigd gedrag), en 'updated_since' bleek
+   * geen erkende filter voor deals.list te zijn. De incrementele filtering gebeurt daarom
+   * client-side in syncEngine.js, op basis van het 'updated_at'-veld dat elke deal meekrijgt.
+   */
+  async listWonDeals() {
     const filter = { status: ['won'] }; // status-filter MOET een array zijn, bevestigd in de API-referentie
-    if (updatedSince) filter.updated_since = updatedSince;
 
     // Sorteren kan bij deals enkel op 'created_at' of 'weighted_value' — 'closed_at' bestaat niet
     // als sorteerveld (al gebruiken we closed_at wel als besteldatum-veld op de deal zelf).
-    // Sideloading is hier niet nodig (enkel de ID's worden gebruikt om de wachtrij te vullen);
-    // de klantnaam wordt per deal opgehaald via getDeal().
     return this.client.listAll('deals', {
       filter,
       sort: [{ field: 'created_at', order: 'desc' }],
