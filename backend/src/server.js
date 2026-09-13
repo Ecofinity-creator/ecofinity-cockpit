@@ -56,12 +56,12 @@ async function main() {
     const projectsRepo = new ProjectsRepo(pool);
     dataProvider = new LiveDataProvider(pool, settingsRepo);
 
-    // Eenmalig herstel: corrigeer deals die door een race-conditie tussen webhook-triggers en
-    // de bulk-wachtrij als "has_linked_project=true" staan zonder bijhorende projects-rij
-    // (de vergrendeling in syncEngine.js voorkomt dit voortaan). Idempotent, dus veilig bij
-    // elke opstart. De betrokken deals worden opnieuw in de wachtrij gezet zodat ze — nu zonder
-    // race — een eerlijke herkansing krijgen, in plaats van permanent als "geen project" te blijven staan.
-    try {
+    // Herstelfunctie voor deals die door een race-conditie tussen webhook-triggers en de
+    // bulk-wachtrij als "has_linked_project=true" staan zonder bijhorende projects-rij (de
+    // vergrendeling in syncEngine.js voorkomt dit voortaan). Idempotent. Draait automatisch bij
+    // elke opstart, én is oproepbaar via POST /admin/repair-inconsistent-deals — nodig omdat de
+    // server tijdens een langlopende achtergrond-sync soms dagenlang niet herstart wordt.
+    async function repairInconsistentDeals() {
       const repairRes = await pool.query(`
         UPDATE deals SET has_linked_project = FALSE
         WHERE has_linked_project = TRUE
@@ -70,10 +70,17 @@ async function main() {
       `);
       if (repairRes.rowCount > 0) {
         const repairedIds = repairRes.rows.map((r) => r.deal_id);
-        console.log(`▶ ${repairRes.rowCount} inconsistente deal(s) hersteld en opnieuw in de wachtrij gezet.`);
         const existingQueue = await settingsRepo.getPendingSyncQueue();
         const merged = Array.from(new Set([...existingQueue, ...repairedIds]));
         await settingsRepo.setPendingSyncQueue(merged);
+      }
+      return repairRes.rowCount;
+    }
+
+    try {
+      const repaired = await repairInconsistentDeals();
+      if (repaired > 0) {
+        console.log(`▶ ${repaired} inconsistente deal(s) hersteld en opnieuw in de wachtrij gezet.`);
       }
     } catch (err) {
       console.error('Kon inconsistente deals niet herstellen (niet-kritiek, ga verder):', err.message);
@@ -87,6 +94,15 @@ async function main() {
 
     app.use('/oauth', buildOAuthRouter(tokenStore));
     app.use('/webhooks', buildWebhookRouter(syncEngine));
+
+    app.post('/admin/repair-inconsistent-deals', async (req, res) => {
+      try {
+        const repaired = await repairInconsistentDeals();
+        res.json({ repaired, message: repaired > 0 ? 'Opnieuw in de wachtrij gezet, roep /admin/sync-now aan om ze te verwerken.' : 'Niets te herstellen.' });
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
 
     app.post('/admin/register-webhooks', async (req, res) => {
       try {
