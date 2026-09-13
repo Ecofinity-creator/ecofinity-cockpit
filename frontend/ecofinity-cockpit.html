@@ -467,6 +467,7 @@ async function connectToBackend(rawUrl){
     state.connected = false;
     state.connectionError = err.message || 'Onbekende fout bij verbinden.';
   }
+  state.connecting = false;
   render();
 }
 
@@ -483,7 +484,7 @@ function disconnectFromBackend(){
 /* ============================================================
    STATE + NAV
    ============================================================ */
-const state = { view:'dashboard', filter:null, selectedId:null, search:'', showClosed:false, apiBase:'', connected:false, connectionError:null };
+const state = { view:'dashboard', filter:null, selectedId:null, search:'', showClosed:false, apiBase:'', connected:false, connecting:false, connectionError:null };
 
 const NAV = [
   {key:'dashboard', n:'—', label:'Overzicht'},
@@ -759,10 +760,11 @@ function viewSettings(){
         </div>
         <div style="display:flex; gap:10px;">
           <input type="text" id="backendUrlInput" placeholder="bv. http://localhost:4000 of https://cockpit-api.ecofinity.be"
-            value="${state.apiBase}"
+            value="${state.apiBase}" ${state.connecting?'disabled':''}
             style="flex:1; font-family:'IBM Plex Mono'; font-size:12.5px; padding:8px 10px; border:1px solid var(--line-strong); background:var(--paper-raised);">
-          <button class="pill-btn" data-connect>Verbinden</button>
+          <button class="pill-btn" data-connect ${state.connecting?'disabled':''}>${state.connecting ? 'Bezig met verbinden…' : 'Verbinden'}</button>
         </div>
+        ${state.connecting ? `<div style="margin-top:10px; font-size:11.5px; color:var(--slate);">Data ophalen kan bij een grote database enkele seconden duren…</div>` : ''}
         ${state.connectionError ? `<div class="warnbox crit" style="margin-top:10px;">⚠ Kon niet verbinden: ${state.connectionError}. Controleer of de backend draait en CORS toestaat.</div>` : ''}
       `}
     </div>
@@ -948,7 +950,11 @@ function render(){
   if(connectBtn){
     connectBtn.addEventListener('click', ()=>{
       const url = main.querySelector('#backendUrlInput').value.trim();
-      if(url) connectToBackend(url);
+      if(url){
+        state.connecting = true;
+        render(); // toon meteen "Bezig met verbinden..." vóór de (mogelijk trage) fetch start
+        connectToBackend(url);
+      }
     });
   }
   const disconnectBtn = main.querySelector('[data-disconnect]');
